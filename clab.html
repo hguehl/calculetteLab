@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- Le but est de tracer la source des sommes versées sur une PU
   * Le premier compte est forcément le compte courant payeur
-  * En cascade doivent etre identifiées les sources si les fonds sont arrivés sur un support il y a moins de 6 mois pour les suuports devant justifier leur origine
+  * En cascade doivent etre identifiées les sources si les fonds sont arrivés sur un support il y a moins de 6 mois pour les supports devant justifier leur origine
   * L'enchainement est synthétisé en résultat dans la chronologie
   * et la liste de documents à fournir par support est affichée
 	* A terme cette liste pourrait etre différente en fonction des assureurs
@@ -1603,6 +1603,19 @@ function getSelectedPartner() {
     return null; 
 }
 
+//  Helpers validateEntries
+function alertAndStop(message) {
+  alert(message);
+  return null;
+}
+
+function sortByDate(entries) {
+  return entries.sort((a, b) => {
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return new Date(a.date) - new Date(b.date);
+  });
+}
 
 function validateEntries(parentDiv) {
   const entries = Array.from(parentDiv.children);
@@ -1610,80 +1623,58 @@ function validateEntries(parentDiv) {
   const results = [];
 
   for (const entry of entries) {
-    const select = entry.querySelector('select');
-    const inputsText = entry.querySelectorAll('input[type="text"]');
-    const inputName = inputsText[0];
-    const inputAccount = inputsText[1];
+    const select = entry.querySelector("select");
+    const [inputName, inputAccount] = entry.querySelectorAll('input[type="text"]');
     const inputAmount = entry.querySelector('input[type="number"]');
     const inputDate = entry.querySelector('input[type="date"]');
-    const subDiv = entry.querySelector('.sub-entries');
-    const supportLabel = select.value;
-    const needsSource = sourceNeedsOrigin(supportLabel);
+    const subDiv = entry.querySelector(".sub-entries");
 
-    if (!select.value) {
-      alert(TEXTS.ERROR_SELECT_SUPPORT);
-      return null;
-    }
-    if (!inputName.value.trim()) {
-      alert(TEXTS.ERROR_ENTER_ESTABLISHMENT);
-      return null;
-    }
+    // --- Validations de base ---
+    if (!select?.value) return alertAndStop(TEXTS.ERROR_SELECT_SUPPORT);
+    if (!inputName?.value.trim()) return alertAndStop(TEXTS.ERROR_ENTER_ESTABLISHMENT);
 
-    const amount = safeParseFloat(inputAmount.value);
-    if (isNaN(amount) || amount < 0) {
-      alert(TEXTS.ERROR_VALID_AMOUNT);
-      return null;
-    }
+    const amount = safeParseFloat(inputAmount?.value);
+    if (isNaN(amount) || amount < 0) return alertAndStop(TEXTS.ERROR_VALID_AMOUNT);
 
-    let isLessThanDateThreshold = false;
+    const dateValue = new Date(inputDate?.value);
+    const dateThreshold = new Date();
+    dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
+    const isLessThanDateThreshold = dateValue > dateThreshold;
+
     let subResults = [];
-  
-	const dateValue = new Date(inputDate.value);
-	const dateThreshold = new Date();
-	dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
-	isLessThanDateThreshold = dateValue > dateThreshold;
+    if (isLessThanDateThreshold && sourceNeedsOrigin(select.value)) {
+      if (subDiv.children.length === 0) {
+        return alertAndStop(formatMessage(TEXTS.ERROR_ADD_SUB_ORIGIN, { name: inputName.value }));
+      }
+      const subValidation = validateEntries(subDiv);
+      if (!subValidation) return null;
+	  subResults = sortByDate(subValidation.results);
 
-	if (isLessThanDateThreshold && needsSource) {
-	if (subDiv.children.length === 0) {
-	  alert(formatMessage(TEXTS.ERROR_ADD_SUB_ORIGIN, { name: inputName.value }));
-	  return null;
-	}
-	const subValidation = validateEntries(subDiv);
-	if (subValidation === null) return null;
-	subResults = subValidation.results;
+      const subSum = subValidation.sum;
+      if (Math.abs(subSum - amount) > 0.01) {
+        return alertAndStop(formatMessage(TEXTS.ERROR_AMOUNT_MISMATCH, {
+          subSum: subSum.toFixed(2),
+          name: inputName.value,
+          amount: amount.toFixed(2)
+        }));
+      }
+    } // isLessThanDateThreshold && sourceNeedsOrigin
 
-	// Tri par date
-	subResults.sort((a, b) => {
-	  if (!a.date) return 1;
-	  if (!b.date) return -1;
-	  return new Date(a.date) - new Date(b.date);
-	});
-
-	const subSum = subValidation.sum;
-	if (Math.abs(subSum - amount) > 0.01) {
-	  alert(formatMessage(TEXTS.ERROR_AMOUNT_MISMATCH, {
-		subSum: subSum.toFixed(2),
-		name: inputName.value,
-		amount: amount.toFixed(2)
-	  }));
-	  return null;
-	}
-	}
- 
     sum += amount;
     results.push({
       support: select.value,
       name: inputName.value.trim(),
-      accountNumber: inputAccount.value.trim(),
+      accountNumber: inputAccount?.value.trim(),
       amount,
-      date: inputDate.value.trim(),
+      date: inputDate?.value.trim(),
       isLessThanDateThreshold,
       subOrigins: subResults
     });
   }
-
   return { sum, results };
 }
+
+
 
 // Affichage des résultats
 function displayResults(results, container) {
