@@ -1,0 +1,1796 @@
+<!DOCTYPE html>
+<!-- Le but est de tracer la source des sommes versées sur une PU
+  * Le premier compte est forcément le compte courant payeur
+  * En cascade doivent etre identifiées les sources si les fonds sont arrivés sur un support il y a moins de 6 mois 
+  * L'enchainement est synthétisé en résultat dans la chronologie
+  * et la liste de documents à fournir par support est affichée
+	* A terme cette liste pourrait etre différente en fonction des assureurs
+	* le radio bouton partner permet de choisir le partner dans la structure contenant les données (sourceOptions). Le libellé doit etre identique à ce qui est fournit dans la structure Json
+  * A noter la liste des banques n'est que suggérée il est possible de modifier le champ pour l'utilisateur
+ --> 
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>calculette LAB</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<style>
+  body { 
+    background-color: #F0F3FF; 
+    color: #08104D; 
+    font-family: Montserrat, sans-serif; 
+    margin: 1rem; 
+    font-size: 14px; 
+  }
+  
+  h1, h4 { 
+    color: #08104D; 
+  }
+  
+  .entry { 
+    border-left: 3px solid #08104D; 
+    margin-left: 1rem; 
+    padding-left: 1rem; 
+    margin-bottom: 1rem; 
+    position: relative; 
+  }
+  
+  .input-group > * { 
+    margin-right: 0.5rem; 
+  }
+  
+  .input-group { 
+    align-items: center; 
+    display: flex; 
+    flex-wrap: wrap; 
+  }
+  
+  .input-group select, 
+  .input-group input[type="text"], 
+  .input-group input[type="number"] { 
+    flex: 1 1 180px; 
+    min-width: 120px; 
+  }
+  
+  .input-group label { 
+    white-space: nowrap; 
+    margin-right: 0.25rem; 
+  }
+  
+  .input-group .btn-sm { 
+    flex: 0 0 auto; 
+  }
+  
+  .sub-entries { 
+    margin-top: 0.75rem; 
+  }
+  
+  .btn-add-sub { 
+    margin-bottom: 0.75rem; 
+  }
+  
+  .checkbox-label { 
+    margin-left: 0.25rem; 
+  }
+  
+  .bg-alt-0 { 
+    background-color: #f9f9f9; 
+  }
+  
+  .bg-alt-1 { 
+    background-color: #e6f7ff; 
+  }
+  
+  .btn-validate { 
+    background-color: orange; 
+    color: white; 
+    border: none; 
+    padding: 8px 16px; 
+    font-weight: bold; 
+    border-radius: 6px; 
+    cursor: pointer; 
+    transition: background-color 0.3s ease; 
+  }
+  
+  .btn-validate.validated { 
+    background-color: #28a745; 
+  }
+  
+  .text-danger { 
+    color: #dc3545 !important; 
+  }
+
+  /* Animation de surbrillance pour les tooltips */
+  @keyframes highlight { 
+    0% { box-shadow: 0 0 10px 3px orange; } 
+    50% { box-shadow: 0 0 10px 3px yellow; } 
+    100% { box-shadow: 0 0 0 0 transparent; } 
+  }
+  
+  .highlight-tooltip { 
+    animation: highlight 10s ease-out forwards; 
+  }
+
+  /* Classe personnalisée pour tooltip rouge Bootstrap 5 */
+  .tooltip-danger {
+    --bs-tooltip-bg: #dc3545;
+    --bs-tooltip-color: #fff;
+  }
+  
+  .header-row {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+  }
+  
+  .header-row .col {
+    font-weight: bold;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1 class="mboui4 text-center">Calculette LAB</h1>
+
+  <div class="card p-3 mb-4">
+	  <div class="d-flex align-items-end justify-content-between">
+	  
+		<div class="flex-grow-1 me-3">
+		  <label for="amount_paid" class="form-label">
+			<strong>Montant PU versée (€)</strong>
+		  </label>
+		  <input type="number" id="amount_paid" class="form-control" min="0" step="0.01" value="0" required />
+		</div>
+
+		<div>
+		  <label class="form-label d-block"><strong>Compagnie</strong></label>
+		  <div class="d-flex">
+			<div class="form-check me-3">
+			  <input class="form-check-input" type="radio" name="partner" id="partnerAbeille" value="Abeille" checked>
+			  <label class="form-check-label" for="partnerAbeille">Abeille</label>
+			</div>
+			<div class="form-check">
+			  <input class="form-check-input" type="radio" name="partner" id="partnerSwiss" value="SwissLife">
+			  <label class="form-check-label" for="partnerSwiss">SwissLife</label>
+			</div>
+		  </div>
+		</div>
+	  </div>
+  </div>
+
+  <form id="form-origins" class="card p-3 mb-4">
+    <h4>Origines des fonds</h4>
+    <div class="row header-row py-2 mb-2">
+      <div class="col">Support</div>
+      <div class="col">Etablissement</div>
+      <div class="col">N° de compte</div>
+      <div class="col">Montant</div>
+      <div class="col">Présents depuis le</div>
+    </div> 
+    <div id="origins-list"></div>
+    <button type="submit" class="btn btn-success btn-validate">Valider</button>
+	  <div class="mt-2 text-end">
+		  <button type="button" class="btn btn-link btn-sm p-0 me-2" onclick="downloadData()" title="Sauvegarder">
+			<i class="bi bi-cloud-download"></i>
+		  </button>
+		  <button type="button" class="btn btn-link btn-sm p-0" onclick="document.getElementById('fileInput').click()" title="Recharger">
+			<i class="bi bi-cloud-upload"></i>
+		  </button>
+		  <input type="file" id="fileInput" style="display:none" onchange="uploadData(event)" />
+	  </div>
+  </form>
+
+
+  <div id="results-term" class="card p-3" style="display:none;">
+    <h4>Chronologie</h4>
+    <div id="results-timeline"></div>
+    <h4>Documents à fournir</h4>
+ 	<div id="results-docs"></div>
+  </div>
+</div>
+
+
+<datalist id="bank-suggestions">
+  <option value="Axa Banque - AXABFRPPXXX">
+  <option value="Banque BCP - CCBPFRPPBCP">
+  <option value="Banque Courtois - CCBPFRPPTLS">
+  <option value="Banque Kolb - CCBPFRPPMTZ">
+  <option value="Banque Laydernier - CCBPFRPPGRE">
+  <option value="Banque Nuger - CCBPFRPPNUG">
+  <option value="Banque Palatine - BSPFFRPPXXX">
+  <option value="Banque Populaire - CCBPFRPPXXX">
+  <option value="Barclays France - BARCFRPPXXX">
+  <option value="BforBank - CEPAFRPP108">
+  <option value="BNP Paribas - BNPAFRPPXXX">
+  <option value="Boursorama Banque - BOUSFRPPXXX">
+  <option value="Caisse d'Épargne - CEPAFRPPXXX">
+  <option value="CIC - CMCIFRPPXXX">
+  <option value="Crédit Agricole - AGRIFRPPXXX">
+  <option value="Crédit Coopératif - CCOPFRPPXXX">
+  <option value="Crédit du Nord - NORDFRPPXXX">
+  <option value="Crédit Mutuel - CMCIFR2A (variable selon caisse)">
+  <option value="Fortuneo - FORTFRPPXXX">
+  <option value="Hello Bank! (BNP) - BNPAFRPPXXX">
+  <option value="HSBC France - CCFRFRPPXXX">
+  <option value="ING Direct - INGDFRPPXXX">
+  <option value="La Banque Postale - PSSTFRPPXXX">
+  <option value="LCL - Crédit Lyonnais - CRLYFRPPXXX">
+  <option value="Monabanq - CCOPFRPPXXX">
+  <option value="Orange Bank - ORNGFR21XXX">
+  <option value="Revolut - REVOGB21XXX">
+  <option value="Société Générale - SOGEFRPPXXX">
+</datalist>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+'use strict';
+// Configuration - Textes paramétrables
+const TEXTS = {
+  // Labels et placeholders
+  CHOOSE_SUPPORT: '-- Choisir support --',
+  ESTABLISHMENT_PLACEHOLDER: 'Etablissement / Nom',
+  ACCOUNT_PLACEHOLDER: 'Numéro de compte',
+  AMOUNT_PLACEHOLDER: 'Montant',
+  
+  // Boutons
+  BTN_ADD_SUB: '+ Sous-origine',
+  BTN_REMOVE: '×',
+  BTN_VALIDATE: 'Valider',
+  
+  // Messages d'aide (tooltips)
+  TOOLTIP_FIRST_LINE: 'Renseigner le compte courant payeur sur la première ligne',
+  TOOLTIP_SUB_ORIGIN: 'Les fonds sont arrivés il y a moins de 6 mois, il faut détailler l\'origine de ces derniers en créant une sous-origine',
+  TOOLTIP_AMOUNT_MISMATCH: 'Somme des sous-origines: {amount} €',
+  
+  // Messages d'erreur
+  ERROR_SELECT_SUPPORT: 'Veuillez sélectionner un support.',
+  ERROR_ENTER_ESTABLISHMENT: 'Veuillez saisir un établissement.',
+  ERROR_VALID_AMOUNT: 'Veuillez saisir un montant valide.',
+  ERROR_ADD_SUB_ORIGIN: 'Veuillez ajouter au moins une sous-origine pour {name}.',
+  ERROR_AMOUNT_MISMATCH: 'La somme des sous-origines ({subSum} €) ne correspond pas au montant de l\'origine "{name}" ({amount} €).',
+  ERROR_PU_AMOUNT_INVALID: 'Veuillez saisir un Montant PU valide (≥ 0).',
+  ERROR_TOTAL_MISMATCH: 'La somme des origines ({sum} €) ne correspond pas au Montant PU versé ({puAmount} €).',
+  
+  // Libellés pour l'affichage des résultats
+  RESULT_SUPPORT: 'Support',
+  RESULT_ESTABLISHMENT: 'Etablissement',
+  RESULT_ACCOUNT: 'Compte',
+  RESULT_AMOUNT: 'Montant',
+  RESULT_DATE: 'Date d\'arrivée des fonds',
+  RESULT_NOT_OLDER_THAN_THRESHOLD: 'Fonds arrivés il y a moins de 6 mois',
+  
+  NEEDED_DOCUMENTS: "Documents requis"
+};
+
+// Configuration - Paramètres
+const CONFIG = {
+  MONTHS_THRESHOLD: 6,
+  TOOLTIP_DURATION_FIRST_LINE: 10000,
+  TOOLTIP_DURATION_SUB_ORIGIN: 5000
+};
+
+// Données de référence devrait etre stockée ailleurs et rappatriée avec fetch()
+const sourceOptions = [
+    {
+        "label": "Compte courant",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé du compte courant payeur de primes à + de 6 mois avec les fonds déjà présents et le relevé du compte courant payeur de primes à date de souscription avec solde suffisant"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé du compte courant payeur de primes à + de 6 mois avec les fonds déjà présents et le relevé du compte courant payeur de primes à date de souscription avec solde suffisant"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Assurance-vie",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Attestation de rachat (et non demande)",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement du rachat stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Attestation de rachat (et non demande)",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement du rachat stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Livret A",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "LEP",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "CEL",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "PEL",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé du PEL à + de 6 mois",
+                    "Attestation de clôture",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé du PEL à + de 6 mois",
+                    "Attestation de clôture",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Livret jeune",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "LDDS",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "CSL",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "CAT/DAT",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Documents d'ouverture",
+                    "Document de clôture (seulement si retrait par anticipation)",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Documents d'ouverture",
+                    "Document de clôture (seulement si retrait par anticipation)",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Epargne salariale",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Attestation de déblocage du paiement",
+                    "Relevé du compte courant payeur de prime à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Attestation de déblocage du paiement",
+                    "Relevé du compte courant payeur de prime à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "PEA/PEA-PME",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé d'épargne à + de 6 mois",
+                    "Si les parts sont investies : avis d'opération de vente des titres/actions",
+                    "Relevé du compte espèce avec décaissement",
+                    "Relevé du compte courant payeur de prime avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé d'épargne à + de 6 mois",
+                    "Si les parts sont investies : avis d'opération de vente des titres/actions",
+                    "Relevé du compte espèce avec décaissement",
+                    "Relevé du compte courant payeur de prime avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Compte-titres",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé d'épargne à + de 6 mois",
+                    "Si les parts sont investies : avis d'opération de vente des titres/actions",
+                    "Relevé du compte espèce avec décaissement",
+                    "Relevé du compte courant payeur de prime avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé d'épargne à + de 6 mois",
+                    "Si les parts sont investies : avis d'opération de vente des titres/actions",
+                    "Relevé du compte espèce avec décaissement",
+                    "Relevé du compte courant payeur de prime avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Donation/don manuel",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Acte notarié du don ou Cerfa de donation visé par l'administration fiscale",
+                    "Si don manuel en ligne, joindre la déclaration et l'accusé de réception",
+                    "Relevé du compte courant payeur de prime à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Nom du donateur et lien avec le souscripteur",
+                    "Date de la donation",
+                    "Montant de la donation",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Acte notarié du don ou Cerfa de donation visé par l'administration fiscale",
+                    "Si don manuel en ligne, joindre la déclaration et l'accusé de réception",
+                    "Relevé du compte courant payeur de prime à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Nom du donateur et lien avec le souscripteur",
+                    "Date de la donation",
+                    "Montant de la donation",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Bénéfice d'assurance-vie",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Attestation datée du bénéfice d'assurance-vie avec montant perçu et le/les bénéficiaires",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Attestation datée du bénéfice d'assurance-vie avec montant perçu et le/les bénéficiaires",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Vente de fonds de commerce",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Copie intégrale du protocole de cession ou attestation notariale ou d'avocat justifiant le montant de la cession",
+                    "Relevé du compte courant payeur de prime avec encaissement stabiloté et solde suffisant à date de souscription"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Copie intégrale du protocole de cession ou attestation notariale ou d'avocat justifiant le montant de la cession",
+                    "Relevé du compte courant payeur de prime avec encaissement stabiloté et solde suffisant à date de souscription"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Vente de parts sociales d'entreprise",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Copie intégrale du protocole de cession ou attestation notariale ou d'avocat justifiant le montant de la cession des parts sociales",
+                    "Relevé du compte courant payeur de prime avec encaissement stabiloté et solde suffisant à date de souscription"
+                ],
+                "comments": [
+                    "Si les fonds issus de la vente arrivent sur le compte courant professionnel, fournir le relevé du compte professionnel avec encaissement puis décaissement vers le compte courant payeur de prime",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Copie intégrale du protocole de cession ou attestation notariale ou d'avocat justifiant le montant de la cession des parts sociales",
+                    "Relevé du compte courant payeur de prime avec encaissement stabiloté et solde suffisant à date de souscription"
+                ],
+                "comments": [
+                    "Si les fonds issus de la vente arrivent sur le compte courant professionnel, fournir le relevé du compte professionnel avec encaissement puis décaissement vers le compte courant payeur de prime",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Prime exceptionnelle",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Copie du bulletin de salaire",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Date et montant des revenus",
+                    "Nature des revenus exceptionnels (prime, bonus, intéressement, levée d'option, …)",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Copie du bulletin de salaire",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Date et montant des revenus",
+                    "Nature des revenus exceptionnels (prime, bonus, intéressement, levée d'option, …)",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Indemnités assurance corporelle",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Document prouvant le montant exact perçu (tribunal, avocat, …)",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "FAIRE CONTRAT DE CAPITALISATION PERSONNE PHYSIQUE pour conserver les avantages fiscaux",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Document prouvant le montant exact perçu (tribunal, avocat, …)",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "FAIRE CONTRAT DE CAPITALISATION PERSONNE PHYSIQUE pour conserver les avantages fiscaux",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Indemnités autres dommages",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Document prouvant le montant exact perçu (tribunal, avocat, …)",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Document prouvant le montant exact perçu (tribunal, avocat, …)",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Cession de biens mobiliers",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Certificat ou acte de cession avec montant de la cession ou attestation notariale",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Date et objet de la vente",
+                    "Montant de la vente",
+                    "Identité du vendeur et de l'acquéreur",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Certificat ou acte de cession avec montant de la cession ou attestation notariale",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Date et objet de la vente",
+                    "Montant de la vente",
+                    "Identité du vendeur et de l'acquéreur",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Succession/héritage",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Acte notarié complet",
+                    "Décompte notarié avec montant exact perçu",
+                    "Relevé du compte courant payeur de prime à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Date du décès",
+                    "Nom de la personne décédée",
+                    "Nom des héritiers",
+                    "Montant de l'héritage (comprenant le montant revenant au souscripteur)",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Acte notarié complet",
+                    "Décompte notarié avec montant exact perçu",
+                    "Relevé du compte courant payeur de prime à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Date du décès",
+                    "Nom de la personne décédée",
+                    "Nom des héritiers",
+                    "Montant de l'héritage (comprenant le montant revenant au souscripteur)",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Vente immobilière ",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Acte de vente complet",
+                    "Décompte notarié",
+                    "Relevé du compte courant payeur de prime à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Date et objet de la vente",
+                    "Montant de la vente (comprenant le montant revenant au souscripteur si plusieurs vendeurs)",
+                    "Identité du vendeur et de l'acquéreur",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Acte de vente complet",
+                    "Décompte notarié",
+                    "Relevé du compte courant payeur de prime à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Date et objet de la vente",
+                    "Montant de la vente (comprenant le montant revenant au souscripteur si plusieurs vendeurs)",
+                    "Identité du vendeur et de l'acquéreur",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Vente immobilière SCI",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Acte de vente complet",
+                    "Décompte notarié",
+                    "Kbis + Statuts de la société",
+                    "Relevé du compte courant payeur de prime à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Date et objet de la vente",
+                    "Montant de la vente (comprenant le montant revenant au souscripteur si plusieurs vendeurs)",
+                    "Identité du vendeur et de l'acquéreur",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Acte de vente complet",
+                    "Décompte notarié",
+                    "Kbis + Statuts de la société",
+                    "Relevé du compte courant payeur de prime à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Date et objet de la vente",
+                    "Montant de la vente (comprenant le montant revenant au souscripteur si plusieurs vendeurs)",
+                    "Identité du vendeur et de l'acquéreur",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Distribution de dividendes",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "PV d'Assemblée Générale avec décision de versement de dividendes",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "PV d'Assemblée Générale avec décision de versement de dividendes",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Indemnités de licenciement",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Solde de tout compte",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Solde de tout compte",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Gains aux jeux",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Copie du justificatif de la Française des Jeux ou autres (PMU, casino, …)",
+                    "OU copie du chèque de la Française des Jeux ou autres",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Nom de l'organisme de jeu",
+                    "Date et montant du gain aux jeux",
+                    "Identité du gagnant",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Copie du justificatif de la Française des Jeux ou autres (PMU, casino, …)",
+                    "OU copie du chèque de la Française des Jeux ou autres",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Nom de l'organisme de jeu",
+                    "Date et montant du gain aux jeux",
+                    "Identité du gagnant",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Remboursement de prêt familial",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Acte sous seing privé initial ou acte authentique notarial initial",
+                    "Justificatifs de remboursement",
+                    "Relevé avec encaissement des sommes restant dues sur le compte courant payeur de prime et solde suffisant à date de souscription",
+                    "Tous documents visant le solde de l'emprunt",
+                    "Cerfa 2062"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Acte sous seing privé initial ou acte authentique notarial initial",
+                    "Justificatifs de remboursement",
+                    "Relevé avec encaissement des sommes restant dues sur le compte courant payeur de prime et solde suffisant à date de souscription",
+                    "Tous documents visant le solde de l'emprunt",
+                    "Cerfa 2062"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Vente d'œuvre d'art",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Attestation de vente de l'objet d'art avec mentions légales obligatoires",
+                    "Certificat d'authentification",
+                    "Relevé avec encaissement du montant de la vente sur le compte courant payeur de prime avec solde suffisant à date de souscription",
+                    "Formulaire 2091-SD ou 2092-SD visé par l'administration fiscale",
+                    "Justificatifs d'entrée en possession si détenue depuis moins de 22 ans"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Attestation de vente de l'objet d'art avec mentions légales obligatoires",
+                    "Certificat d'authentification",
+                    "Relevé avec encaissement du montant de la vente sur le compte courant payeur de prime avec solde suffisant à date de souscription",
+                    "Formulaire 2091-SD ou 2092-SD visé par l'administration fiscale",
+                    "Justificatifs d'entrée en possession si détenue depuis moins de 22 ans"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Contrat ou bon de capitalisation",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Attestation de rachat (et non demande)",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement du rachat stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Attestation de rachat (et non demande)",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement du rachat stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Vente de cryptoactifs",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé du portefeuille des cryptoactifs à 1 an",
+                    "Relevé de vente des cryptoactifs à ce jour",
+                    "Relevé du compte courant payeur de prime à date de souscription"
+                ],
+                "comments": [
+                    "Date de vente",
+                    "Prix de cession",
+                    "Identité du vendeur",
+                    "Lorsque les cryptoactifs ont été acquis il y a moins d'un an, l'origine antérieure doit être clairement précisée et justifiée",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé du portefeuille des cryptoactifs à 1 an",
+                    "Relevé de vente des cryptoactifs à ce jour",
+                    "Relevé du compte courant payeur de prime à date de souscription"
+                ],
+                "comments": [
+                    "Date de vente",
+                    "Prix de cession",
+                    "Identité du vendeur",
+                    "Lorsque les cryptoactifs ont été acquis il y a moins d'un an, l'origine antérieure doit être clairement précisée et justifiée",
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Vente de métaux précieux",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Attestation de vente de métaux précieux avec mentions légales obligatoires",
+                    "Certificat d'authentification",
+                    "Relevé avec encaissement du montant de la vente sur le compte courant payeur de prime avec solde suffisant à date de souscription",
+                    "Formulaire 2091-SD ou 2092-SD visé par l'administration fiscale",
+                    "Fustificatif d'entrée en possession si détenus depuis moins de 22 ans"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Attestation de vente de métaux précieux avec mentions légales obligatoires",
+                    "Certificat d'authentification",
+                    "Relevé avec encaissement du montant de la vente sur le compte courant payeur de prime avec solde suffisant à date de souscription",
+                    "Formulaire 2091-SD ou 2092-SD visé par l'administration fiscale",
+                    "Fustificatif d'entrée en possession si détenus depuis moins de 22 ans"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+    {
+        "label": "Remboursement de compte courant d'associé",
+        "needSource": 0,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé du compte courant d'associé à + de 6 mois",
+                    "Relevé du compte courant professionnel avec décaissement",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription + attestation de l'expert-comptable certifiant l'opération ou PV d'AG"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé du compte courant d'associé à + de 6 mois",
+                    "Relevé du compte courant professionnel avec décaissement",
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription + attestation de l'expert-comptable certifiant l'opération ou PV d'AG"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    }
+]
+
+// Éléments DOM
+const originsList = document.getElementById('origins-list');
+const formOrigins = document.getElementById('form-origins');
+const resultsTerm = document.getElementById('results-term');
+const resultsTimeline = document.getElementById('results-timeline');
+const resultsDocs = document.getElementById('results-docs');
+const amountPaidInput = document.getElementById('amount_paid');
+const validateBtn = formOrigins.querySelector('button[type="submit"]');
+
+// Utilitaires
+function formatCurrency(amount) {
+  return amount.toLocaleString('fr-FR', { minimumFractionDigits: 2 });
+}
+
+function safeParseFloat(value, fallback = 0) {
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? fallback : parsed;
+}
+
+function formatMessage(message, replacements = {}) {
+  return Object.entries(replacements).reduce((msg, [key, value]) => {
+    return msg.replace(`{${key}}`, value);
+  }, message);
+}
+
+function getSourceByLabel(label) {
+  return sourceOptions.find(item => item.label === label);
+}
+
+// gestion needSource
+function sourceNeedsOrigin(supportLabel) {
+  const source = getSourceByLabel(supportLabel);
+  return source ? source.needSource === 1 : true; 
+}
+
+function toggleSourceElements(entry, supportLabel) {
+  const inputDate = entry.querySelector('input[type="date"]');
+  //const dateContainer = inputDate.parentElement;
+  const btnAddSub = entry.querySelector('.btn-add-sub');
+  const subEntriesDiv = entry.querySelector('.sub-entries');
+  const needsSource = sourceNeedsOrigin(supportLabel);
+  
+  if (needsSource) {
+	//affichage masquage de la date plus néssaire...
+    //dateContainer.style.display = 'none';
+	//dateContainer.classList.remove('d-none');
+    //dateContainer.classList.add('d-flex');	
+	//inputDate.required = true;
+    if (inputDate && inputDate.value) {
+      const dateValue = new Date(inputDate.value);
+      const dateThreshold = new Date();
+      dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
+      if (dateValue > dateThreshold && btnAddSub) {
+        btnAddSub.style.display = 'inline-block';
+      }
+    }
+  } else { //if needSource
+    //dateContainer.style.display = 'none';
+	//dateContainer.classList.add('d-none');
+    //dateContainer.classList.remove('d-flex');	
+    //inputDate.required = false;
+    //inputDate.value = ''; 
+    btnAddSub.style.display = 'none';
+    if (subEntriesDiv) subEntriesDiv.innerHTML = '';
+  } // else needSource
+}
+
+
+// sauvegarde
+// Exporter les données en JSON
+function downloadData() {
+  const puAmount = safeParseFloat(amountPaidInput.value);
+  const partner = getSelectedPartner();
+  const validation = validateEntries(originsList);
+  if (validation === null) return;
+
+  const data = { puAmount, partner, entries: validation.results };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "calculetteLAB.json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Importer les données JSON
+function uploadData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = JSON.parse(e.target.result);
+
+    amountPaidInput.value = data.puAmount;
+    document.querySelector(`input[name="partner"][value="${data.partner}"]`).checked = true;
+
+    originsList.innerHTML = "";
+    createEntry(originsList, 1, true);
+    resultsTimeline.innerHTML = '';
+    resultsDocs.innerHTML = '';
+    resultsTerm.style.display = 'none';
+    setButtonValidated(false);
+    
+    // Restauration récursive
+    function restoreEntries(results, parentDiv, level = 1) {
+      results.forEach((r, idx) => {
+        let entry;
+        if (level === 1 && idx === 0) {
+          entry = parentDiv.children[0]; // première ligne déjà créée
+        } else entry = createEntry(parentDiv, level);
+
+        const select = entry.querySelector("select");
+        const inputsText = entry.querySelectorAll('input[type="text"]');
+        const inputName = inputsText[0];
+        const inputAccount = inputsText[1];
+        const inputAmount = entry.querySelector('input[type="number"]');
+        const inputDate = entry.querySelector('input[type="date"]');
+
+        select.value = r.support;
+        inputName.value = r.name;
+        inputAccount.value = r.accountNumber;
+        inputAmount.value = r.amount;
+        if (r.date) inputDate.value = r.date;
+        toggleSourceElements(entry, r.support);
+        if (r.subOrigins && r.subOrigins.length > 0) {
+          const btnAddSub = entry.querySelector(".btn-add-sub");
+          btnAddSub.style.display = "inline-block";
+          const subDiv = entry.querySelector(".sub-entries");
+          restoreEntries(r.subOrigins, subDiv, level + 1);
+        }
+      }); // forEach
+    }
+
+    restoreEntries(data.entries, originsList);
+  };
+  reader.readAsText(file);
+  document.getElementById('fileInput').value = '';
+}
+
+// Gestion de la couleur du bouton valider
+function setButtonValidated(valid) {
+  if (valid) {
+    validateBtn.classList.add('validated');
+    validateBtn.classList.remove('btn-warning');
+  } else {
+    validateBtn.classList.remove('validated');
+    validateBtn.classList.add('btn-warning');
+  }
+}
+
+function markModified() {
+  setButtonValidated(false);
+  resultsTerm.style.display = 'none';
+}
+
+// Gestion des tooltips et montants
+function updateParentAmountStatus(entry) {
+  const inputAmountParent = entry.querySelector('.input-group input[type="number"]');
+  const subEntries = entry.querySelector(':scope > .sub-entries');
+  if (!inputAmountParent || !subEntries) return;
+
+  // Calcul de la somme des sous-origines directes
+  const directChildren = Array.from(subEntries.children);
+  const subSum = directChildren.reduce((acc, child) => {
+    const amt = child.querySelector('.input-group input[type="number"]');
+    return acc + safeParseFloat(amt?.value);
+  }, 0);
+  const parentAmount = safeParseFloat(inputAmountParent.value);
+
+  // Reset du tooltip existant
+  let tip = bootstrap.Tooltip.getInstance(inputAmountParent);
+  if (tip) tip.dispose();
+
+  // Vérification et affichage du tooltip si nécessaire
+  if (directChildren.length > 0 && Math.abs(subSum - parentAmount) > 0.01) {
+    inputAmountParent.classList.add('text-danger');
+    const tooltipText = formatMessage(TEXTS.TOOLTIP_AMOUNT_MISMATCH, { 
+      amount: formatCurrency(subSum) 
+    });
+    inputAmountParent.setAttribute('title', tooltipText);
+    inputAmountParent.setAttribute('data-bs-toggle', 'tooltip');
+    inputAmountParent.setAttribute('data-bs-placement', 'top');
+    inputAmountParent.setAttribute('data-bs-custom-class', 'tooltip-danger');
+    tip = new bootstrap.Tooltip(inputAmountParent);
+    tip.show();
+  } else {
+    inputAmountParent.classList.remove('text-danger');
+    inputAmountParent.removeAttribute('title');
+    inputAmountParent.removeAttribute('data-bs-toggle');
+    inputAmountParent.removeAttribute('data-bs-placement');
+    inputAmountParent.removeAttribute('data-bs-custom-class');
+  }
+}
+
+//  Création d'une ligne du formulaire  
+function createEntry(parentDiv = originsList, groupIndex = 1, isFirst = false) {
+  const entryDiv = createMainContainer(groupIndex);
+  const group = document.createElement('div');
+  group.className = 'input-group';
+
+  const select = createSupportSelect();
+  const inputName = createEstablishmentInput();
+  const inputAccount = createAccountInput();
+  const inputAmount = createAmountInput();
+  const dateDiv = createDateContainer();
+  const btnAddSub = createAddSubButton();
+  const btnRemove = createRemoveButton();
+  const subEntriesDiv = createSubEntriesContainer();
+
+  group.appendChild(select);
+  group.appendChild(inputName);
+  group.appendChild(inputAccount);
+  group.appendChild(inputAmount);
+  group.appendChild(dateDiv);
+  group.appendChild(btnAddSub);
+  group.appendChild(btnRemove);
+
+  entryDiv.appendChild(group);
+  entryDiv.appendChild(subEntriesDiv);
+  parentDiv.appendChild(entryDiv);
+
+  if (isFirst) configureFirstLine(select, inputAmount, inputAccount, btnRemove, entryDiv);
+
+  setupEventListeners({inputDate: dateDiv.querySelector('input'),btnAddSub,subEntriesDiv,btnRemove,inputAmount,entryDiv,groupIndex,select,inputName,inputAccount});
+
+  return entryDiv;
+}
+
+//  Fonctions de création d'éléments pour createEntry 
+function createMainContainer(groupIndex) {
+  const entryDiv = document.createElement('div');
+  entryDiv.className = `entry ${groupIndex === 1 ? 'bg-alt-1' : 'bg-alt-0'}`;
+  return entryDiv;
+}
+
+function createSupportSelect() {
+  const select = document.createElement('select');
+  select.className = 'form-control';
+  select.required = true;
+  
+  const placeholderOpt = document.createElement('option');
+  placeholderOpt.value = '';
+  placeholderOpt.textContent = TEXTS.CHOOSE_SUPPORT;
+  placeholderOpt.disabled = true;
+  placeholderOpt.selected = true;
+  select.appendChild(placeholderOpt);
+  
+  sourceOptions.forEach(opt => {
+    const option = document.createElement('option');
+    option.value = opt.label;
+    option.textContent = opt.label;
+    select.appendChild(option);
+  });
+  return select;
+}
+
+
+function createEstablishmentInput() {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = TEXTS.ESTABLISHMENT_PLACEHOLDER;
+  input.className = 'form-control';
+  input.setAttribute('list', 'bank-suggestions');
+  input.required = true;
+  return input;
+}
+
+function createAccountInput() {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = TEXTS.ACCOUNT_PLACEHOLDER;
+  input.className = 'form-control';
+  input.required = false;
+  return input;
+}
+
+function createAmountInput() {
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0';
+  input.step = '0.01';
+  input.placeholder = TEXTS.AMOUNT_PLACEHOLDER;
+  input.className = 'form-control';
+  input.style.flex = '0 0 120px';
+  input.style.maxWidth = '120px';
+  input.required = true;
+  return input;
+}
+
+function createDateContainer() {
+  const dateDiv = document.createElement('div');
+  dateDiv.className = 'd-flex align-items-center';
+  dateDiv.style.flex = '0 0 180px';
+  
+  const inputDate = document.createElement('input');
+  inputDate.type = 'date';
+  inputDate.className = 'form-control';
+  inputDate.required = true;
+  
+  dateDiv.appendChild(inputDate);
+  return dateDiv;
+}
+
+function createAddSubButton() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = TEXTS.BTN_ADD_SUB;
+  btn.className = 'btn btn-secondary btn-sm btn-add-sub';
+  btn.style.display = 'none';
+  return btn;
+}
+
+function createRemoveButton() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = TEXTS.BTN_REMOVE;
+  btn.className = 'btn btn-danger btn-sm';
+  return btn;
+}
+
+function createSubEntriesContainer() {
+  const div = document.createElement('div');
+  div.className = 'sub-entries';
+  return div;
+}
+
+function configureFirstLine(select, inputAmount, inputAccount, btnRemove, entryDiv) {
+  select.value = 'Compte courant';
+  select.disabled = true;
+  inputAmount.value = safeParseFloat(amountPaidInput.value);
+  inputAmount.disabled = true;
+  inputAccount.required = false;
+  btnRemove.style.display = 'none';
+
+  select.setAttribute('title', TEXTS.TOOLTIP_FIRST_LINE);
+  select.setAttribute('data-bs-toggle', 'tooltip');
+  select.setAttribute('data-bs-placement', 'top');
+  const firstTooltip = new bootstrap.Tooltip(select);
+  firstTooltip.show();
+  select.classList.add('highlight-tooltip');
+  setTimeout(() => {
+    firstTooltip.hide();
+    select.classList.remove('highlight-tooltip');
+  }, CONFIG.TOOLTIP_DURATION_FIRST_LINE);
+
+  // Synchronisation avec le montant PU
+  amountPaidInput.addEventListener('input', () => {
+    inputAmount.value = safeParseFloat(amountPaidInput.value);
+    markModified();
+    updateParentAmountStatus(entryDiv);
+  });
+}
+
+
+function setupEventListeners(elements) {
+  const { inputDate, btnAddSub, subEntriesDiv, btnRemove, inputAmount, entryDiv, groupIndex, select, inputName, inputAccount } = elements;
+
+  // Gestion du changement de support
+  select.addEventListener('change', () => {
+    toggleSourceElements(entryDiv, select.value);
+    markModified();
+  });
+
+  // Changement de date
+  inputDate.addEventListener('change', () => {
+    const supportLabel = select.value;
+    if (!sourceNeedsOrigin(supportLabel)) return;
+
+    const dateValue = new Date(inputDate.value);
+    const dateThreshold = new Date();
+    dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
+
+    if (dateValue && dateValue > dateThreshold) {
+      btnAddSub.style.display = 'inline-block';
+      btnAddSub.setAttribute('title', TEXTS.TOOLTIP_SUB_ORIGIN);
+      btnAddSub.setAttribute('data-bs-toggle', 'tooltip');
+      btnAddSub.setAttribute('data-bs-placement', 'top');
+      const subTooltip = new bootstrap.Tooltip(btnAddSub);
+      subTooltip.show();
+      setTimeout(() => subTooltip.hide(), CONFIG.TOOLTIP_DURATION_SUB_ORIGIN);
+    } else {
+      btnAddSub.style.display = 'none';
+      subEntriesDiv.innerHTML = '';
+      updateParentAmountStatus(entryDiv);
+    }
+    markModified();
+  });
+
+  // Ajout de sous-origine
+  btnAddSub.addEventListener('click', () => {
+    const subEntry = createEntry(subEntriesDiv, groupIndex + 1);
+    const subAmount = subEntry.querySelector('.input-group input[type="number"]');
+    subAmount.addEventListener('input', () => updateParentAmountStatus(entryDiv));
+    updateParentAmountStatus(entryDiv);
+    markModified();
+  });
+
+  // Mise à jour du montant parent
+  inputAmount.addEventListener('input', () => {
+    updateParentAmountStatus(entryDiv);
+    markModified();
+  });
+
+  // Suppression d'entrée
+  btnRemove.addEventListener('click', () => {
+    const parentEntry = entryDiv.parentElement.closest('.entry');
+    entryDiv.remove();
+    if (parentEntry) updateParentAmountStatus(parentEntry);
+    markModified();
+  });
+
+  // Événements de modification
+  [select, inputName, inputAccount, inputDate].forEach(element => { element.addEventListener('input', markModified); });
+}
+
+// gestion radio bouton
+function getSelectedPartner() {
+    const selected = document.querySelector('input[name="partner"]:checked');
+    if (selected) return selected.value;
+    return null; 
+}
+
+
+function validateEntries(parentDiv) {
+  const entries = Array.from(parentDiv.children);
+  let sum = 0;
+  const results = [];
+
+  for (const entry of entries) {
+    const select = entry.querySelector('select');
+    const inputsText = entry.querySelectorAll('input[type="text"]');
+    const inputName = inputsText[0];
+    const inputAccount = inputsText[1];
+    const inputAmount = entry.querySelector('input[type="number"]');
+    const inputDate = entry.querySelector('input[type="date"]');
+    const subDiv = entry.querySelector('.sub-entries');
+    const supportLabel = select.value;
+    const needsSource = sourceNeedsOrigin(supportLabel);
+
+    if (!select.value) {
+      alert(TEXTS.ERROR_SELECT_SUPPORT);
+      return null;
+    }
+    if (!inputName.value.trim()) {
+      alert(TEXTS.ERROR_ENTER_ESTABLISHMENT);
+      return null;
+    }
+
+    const amount = safeParseFloat(inputAmount.value);
+    if (isNaN(amount) || amount < 0) {
+      alert(TEXTS.ERROR_VALID_AMOUNT);
+      return null;
+    }
+
+    let isLessThanDateThreshold = false;
+    let subResults = [];
+  
+	const dateValue = new Date(inputDate.value);
+	const dateThreshold = new Date();
+	dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
+	isLessThanDateThreshold = dateValue > dateThreshold;
+
+	if (isLessThanDateThreshold && needsSource) {
+	if (subDiv.children.length === 0) {
+	  alert(formatMessage(TEXTS.ERROR_ADD_SUB_ORIGIN, { name: inputName.value }));
+	  return null;
+	}
+	const subValidation = validateEntries(subDiv);
+	if (subValidation === null) return null;
+	subResults = subValidation.results;
+
+	// Tri par date
+	subResults.sort((a, b) => {
+	  if (!a.date) return 1;
+	  if (!b.date) return -1;
+	  return new Date(a.date) - new Date(b.date);
+	});
+
+	const subSum = subValidation.sum;
+	if (Math.abs(subSum - amount) > 0.01) {
+	  alert(formatMessage(TEXTS.ERROR_AMOUNT_MISMATCH, {
+		subSum: subSum.toFixed(2),
+		name: inputName.value,
+		amount: amount.toFixed(2)
+	  }));
+	  return null;
+	}
+	}
+ 
+    sum += amount;
+    results.push({
+      support: select.value,
+      name: inputName.value.trim(),
+      accountNumber: inputAccount.value.trim(),
+      amount,
+      date: inputDate.value.trim(),
+      isLessThanDateThreshold,
+      subOrigins: subResults
+    });
+  }
+
+  return { sum, results };
+}
+
+// Affichage des résultats
+function displayResults(results, container) {
+  const ul = document.createElement('ul');
+  results.forEach(r => {
+    const li = document.createElement('li');
+    li.innerHTML = "<strong>"+TEXTS.RESULT_SUPPORT+"</strong> " + r.support +
+                   ", <strong>"+TEXTS.RESULT_ESTABLISHMENT+":</strong> " + r.name +
+                   ", <strong>"+TEXTS.RESULT_ACCOUNT+"</strong> " + r.accountNumber +
+                   ", <strong>"+TEXTS.RESULT_AMOUNT+":</strong> " + r.amount.toLocaleString('fr-FR', {minimumFractionDigits:2}) + " €";
+    if (r.date) {
+      li.innerHTML += ", <strong>"+TEXTS.RESULT_DATE+":</strong> " + r.date;
+    }
+    if ( r.isLessThanDateThreshold ) li.innerHTML = li.innerHTML + ", <strong>"+TEXTS.RESULT_NOT_OLDER_THAN_THRESHOLD+"</strong> ";
+  
+    if (r.subOrigins.length > 0) li.appendChild(displayResults(r.subOrigins, li));
+    ul.appendChild(li);
+  });
+  container.appendChild(ul);
+  return ul;
+}
+
+// Affichage des Documents
+function displayNeededDocuments(results, partner, tbody, level) {
+  results.forEach(r => {
+    const source = getSourceByLabel(r.support);
+    if (source) {
+	  if (!(r.isLessThanDateThreshold && level == 1)) // on ne traite pas le compte courant s'il a une sous origine
+		{
+		  const row = document.createElement("tr");
+		  const cell1 = document.createElement("td");
+		  const cell2 = document.createElement("td");
+		  const cell3 = document.createElement("td");
+		  cell1.innerHTML = r.support +
+					   "<strong>/</strong> " + r.name +
+					   "<strong>/</strong> " + r.accountNumber +
+					   "<strong>/</strong> " + r.amount.toLocaleString('fr-FR', {minimumFractionDigits:2}) + " €";
+		  source.partners[partner].documents.forEach(doc => {
+			const p=document.createElement('p');
+			p.innerHTML = doc;
+			cell2.appendChild(p);
+		  });
+		  const p=document.createElement('p');
+		  source.partners[partner].comments.forEach(doc => {
+			const p=document.createElement('p');
+			p.innerHTML = doc;
+			cell3.appendChild(p);
+		  });
+		  row.appendChild(cell1);
+		  row.appendChild(cell2);
+		  row.appendChild(cell3);
+		  tbody.appendChild(row);
+		}
+    };
+    if (r.subOrigins.length > 0) displayNeededDocuments(r.subOrigins, partner, tbody, level+1);
+    return tbody;
+  });
+ }
+
+// Soumission du formulaire
+formOrigins.addEventListener('submit', e => {
+  e.preventDefault();
+  const puAmount = safeParseFloat(amountPaidInput.value);
+  
+  if (isNaN(puAmount) || puAmount < 0) {
+    alert(TEXTS.ERROR_PU_AMOUNT_INVALID);
+    return;
+  }
+
+  const validation = validateEntries(originsList);
+  if (validation === null) return;
+
+  if (Math.abs(validation.sum - puAmount) > 0.01) {
+    alert(formatMessage(TEXTS.ERROR_TOTAL_MISMATCH, {
+      sum: validation.sum.toFixed(2),
+      puAmount: puAmount.toFixed(2)
+    }));
+    return;
+  }
+
+  resultsTimeline.innerHTML = '';
+  displayResults(validation.results, resultsTimeline);
+  const table = document.createElement('table');
+  table.className = 'table table-bordered table-striped';
+  const thead = document.createElement('thead');
+  thead.innerHTML ="<tr><th>Support</th><th>Documents requis</th><th>Informations</th></tr>";
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  table.appendChild(tbody);
+  displayNeededDocuments(validation.results,getSelectedPartner(), tbody,1);
+  resultsDocs.innerHTML = '';
+  resultsDocs.appendChild(table);
+  resultsTerm.style.display = 'block';
+  setButtonValidated(true);
+});
+
+// Initialisation
+document.querySelectorAll('input[name="partner"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      markModified();
+    });
+});
+validateBtn.classList.add('btn-warning');
+amountPaidInput.addEventListener('input', markModified);
+originsList.addEventListener('input', markModified);
+let originGroupIndex = 1; // originGroupIndex pour la gestion couleurs
+createEntry(originsList, originGroupIndex, true);
+</script>
+</body>
+</html> 
