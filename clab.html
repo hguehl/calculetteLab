@@ -1617,63 +1617,73 @@ function sortByDate(entries) {
   });
 }
 
-function validateEntries(parentDiv) {
-  const entries = Array.from(parentDiv.children);
-  let sum = 0;
-  const results = [];
+function validateEntry(entry) {
+  const select       = entry.querySelector('select')
+  const inputsText   = entry.querySelectorAll('input[type="text"]')
+  const inputName    = inputsText[0]
+  const inputAccount = inputsText[1]
+  const inputAmount  = entry.querySelector('input[type="number"]')
+  const inputDate    = entry.querySelector('input[type="date"]')
+  const subDiv       = entry.querySelector('.sub-entries')
+  const supportLabel = select.value
+  const needsSource  = sourceNeedsOrigin(supportLabel)
 
-  for (const entry of entries) {
-    const select = entry.querySelector("select");
-    const [inputName, inputAccount] = entry.querySelectorAll('input[type="text"]');
-    const inputAmount = entry.querySelector('input[type="number"]');
-    const inputDate = entry.querySelector('input[type="date"]');
-    const subDiv = entry.querySelector(".sub-entries");
+  if (!supportLabel) return alertAndStop(TEXTS.ERROR_SELECT_SUPPORT)
+  if (!inputName.value.trim()) return alertAndStop(TEXTS.ERROR_ENTER_ESTABLISHMENT)
 
-    // --- Validations de base ---
-    if (!select?.value) return alertAndStop(TEXTS.ERROR_SELECT_SUPPORT);
-    if (!inputName?.value.trim()) return alertAndStop(TEXTS.ERROR_ENTER_ESTABLISHMENT);
+  const amount = safeParseFloat(inputAmount.value)
+  if (isNaN(amount) || amount < 0) return alertAndStop(TEXTS.ERROR_VALID_AMOUNT)
 
-    const amount = safeParseFloat(inputAmount?.value);
-    if (isNaN(amount) || amount < 0) return alertAndStop(TEXTS.ERROR_VALID_AMOUNT);
+  const dateValue = new Date(inputDate.value)
+  const dateThreshold = new Date()
+  dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD)
+  const isLessThanDateThreshold = dateValue > dateThreshold
 
-    const dateValue = new Date(inputDate?.value);
-    const dateThreshold = new Date();
-    dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
-    const isLessThanDateThreshold = dateValue > dateThreshold;
+  let subResults = []
+  if (isLessThanDateThreshold && needsSource) {
+    if (subDiv.children.length === 0)
+      return alertAndStop(formatMessage(TEXTS.ERROR_ADD_SUB_ORIGIN, { name: inputName.value }))
 
-    let subResults = [];
-    if (isLessThanDateThreshold && sourceNeedsOrigin(select.value)) {
-      if (subDiv.children.length === 0) {
-        return alertAndStop(formatMessage(TEXTS.ERROR_ADD_SUB_ORIGIN, { name: inputName.value }));
-      }
-      const subValidation = validateEntries(subDiv);
-      if (!subValidation) return null;
-	  subResults = sortByDate(subValidation.results);
+    const subValidation = validateEntries(subDiv)
+    if (!subValidation) return null
 
-      const subSum = subValidation.sum;
-      if (Math.abs(subSum - amount) > 0.01) {
-        return alertAndStop(formatMessage(TEXTS.ERROR_AMOUNT_MISMATCH, {
-          subSum: subSum.toFixed(2),
-          name: inputName.value,
-          amount: amount.toFixed(2)
-        }));
-      }
-    } // isLessThanDateThreshold && sourceNeedsOrigin
+    subResults = sortByDate(subValidation.results)
 
-    sum += amount;
-    results.push({
-      support: select.value,
-      name: inputName.value.trim(),
-      accountNumber: inputAccount?.value.trim(),
-      amount,
-      date: inputDate?.value.trim(),
-      isLessThanDateThreshold,
-      subOrigins: subResults
-    });
+    const subSum = subValidation.sum
+    if (Math.abs(subSum - amount) > 0.01)
+      return alertAndStop(formatMessage(TEXTS.ERROR_AMOUNT_MISMATCH, {
+        subSum: subSum.toFixed(2),
+        name: inputName.value,
+        amount: amount.toFixed(2)
+      }))
   }
-  return { sum, results };
+
+  return {
+    support: supportLabel,
+    name: inputName.value.trim(),
+    accountNumber: inputAccount.value.trim(),
+    amount,
+    date: inputDate.value.trim(),
+    isLessThanDateThreshold,
+    subOrigins: subResults
+  }
 }
 
+function validateEntries(parentDiv) {
+  const entries = Array.from(parentDiv.children)
+  let sum = 0
+  const results = []
+
+  for (const entry of entries) {
+    const validated = validateEntry(entry)
+    if (!validated) return null
+
+    sum += validated.amount
+    results.push(validated)
+  }
+
+  return { sum, results }
+}
 
 
 // Affichage des résultats
