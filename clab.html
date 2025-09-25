@@ -2,7 +2,6 @@
 <!-- Le but est de tracer la source des sommes versées sur une PU
   * Le premier compte est forcément le compte courant payeur
   * En cascade doivent etre identifiées les sources si les fonds sont arrivés sur un support il y a moins de 6 mois pour les supports devant justifier leur origine
-  * L'enchainement est synthétisé en résultat dans la chronologie
   * et la liste de documents à fournir par support est affichée
 	* A terme cette liste pourrait etre différente en fonction des assureurs
 	* le radio bouton partner permet de choisir le partner dans la structure contenant les données (sourceOptions). Le libellé doit etre identique à ce qui est fournit dans la structure Json
@@ -142,6 +141,20 @@
 		  </label>
 		  <input type="number" id="amount_paid" class="form-control" min="0" step="0.01" value="0" required />
 		</div>
+		
+		<div class="flex-grow-1 me-3">
+		  <label for="last_name" class="form-label">
+			<strong>Nom</strong>
+		  </label>
+		  <input type="text" id="last_name" class="form-control" min="0" step="0.01" value="" required />
+		</div>
+		<div class="flex-grow-1 me-3">
+		  <label for="first_name" class="form-label">
+			<strong>Prénom</strong>
+		  </label>
+		  <input type="text" id="first_name" class="form-control" min="0" step="0.01" value="" required />
+		</div>
+		
 
 		<div>
 		  <label class="form-label d-block"><strong>Compagnie</strong></label>
@@ -183,8 +196,6 @@
 
 
   <div id="results-term" class="card p-3" style="display:none;">
-    <h4>Chronologie</h4>
-    <div id="results-timeline"></div>
     <h4>Documents à fournir</h4>
  	<div id="results-docs"></div>
   </div>
@@ -234,13 +245,13 @@ const TEXTS = {
   AMOUNT_PLACEHOLDER: 'Montant',
   
   // Boutons
-  BTN_ADD_SUB: '+ Sous-origine',
+  BTN_ADD_SUB: '+ Origine précédente',
   BTN_REMOVE: '×',
   BTN_VALIDATE: 'Valider',
   
   // Messages d'aide (tooltips)
   TOOLTIP_FIRST_LINE: 'Renseigner le compte courant payeur sur la première ligne',
-  TOOLTIP_SUB_ORIGIN: 'Les fonds sont arrivés il y a moins de 6 mois, il faut détailler l\'origine de ces derniers en créant une sous-origine',
+  TOOLTIP_SUB_ORIGIN: 'Les fonds sont arrivés il y a moins de 6 mois, il faut détailler en indiquant l\'origine précédente',
   TOOLTIP_AMOUNT_MISMATCH: 'Somme des sous-origines: {amount} €',
   
   // Messages d'erreur
@@ -750,7 +761,7 @@ const sourceOptions = [
                     "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription et encaissement stabiloté"
                 ],
                 "comments": [
-                    "FAIRE CONTRAT DE CAPITALISATION PERSONNE PHYSIQUE pour conserver les avantages fiscaux",
+                    "<b> <p style=\"color:#FF0000;\"> FAIRE CONTRAT DE CAPITALISATION PERSONNE PHYSIQUE</p></b> pour conserver les avantages fiscaux",
                     "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
                 ]
             },
@@ -1205,6 +1216,39 @@ function getSourceByLabel(label) {
   return sourceOptions.find(item => item.label === label);
 }
 
+function sanitizeName(input, maxLen = 100) {
+  if (!input) return '';
+  // normaliser les espaces
+  let s = input.trim().replace(/\s+/g, ' ');
+  // garder seulement les caractères autorisés (lettres unicode, espaces, - et ')
+  s = s.replace(/[^\p{L}\p{M}\s'\-]/gu, '');
+  if (s.length > maxLen) s = s.slice(0, maxLen);
+  return s;
+}
+
+
+
+function populateNameSurnameFromQuery() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const rawLast = params.get('last_name') || params.get('nom') || '';
+    const rawFirst = params.get('first_name') || params.get('prenom') || '';
+
+    const last = sanitizeName(decodeURIComponent(rawLast));
+    const first = sanitizeName(decodeURIComponent(rawFirst));
+
+    if (last) {
+      const el = document.getElementById('last_name');
+      if (el) el.value = last;
+    }
+    if (first) {
+      const el = document.getElementById('first_name');
+      if (el) el.value = first;
+    }
+  } catch (e) {
+    console.warn('populateFromQuery error', e);
+  }
+}
 // gestion needSource
 function sourceNeedsOrigin(supportLabel) {
   const source = getSourceByLabel(supportLabel);
@@ -1219,12 +1263,7 @@ function toggleSourceElements(entry, supportLabel) {
   const needsSource = sourceNeedsOrigin(supportLabel);
   
   if (needsSource) {
-	//affichage masquage de la date plus néssaire...
-    //dateContainer.style.display = 'none';
-	//dateContainer.classList.remove('d-none');
-    //dateContainer.classList.add('d-flex');	
-	//inputDate.required = true;
-    if (inputDate && inputDate.value) {
+	if (inputDate && inputDate.value) {
       const dateValue = new Date(inputDate.value);
       const dateThreshold = new Date();
       dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
@@ -1233,11 +1272,6 @@ function toggleSourceElements(entry, supportLabel) {
       }
     }
   } else { //if needSource
-    //dateContainer.style.display = 'none';
-	//dateContainer.classList.add('d-none');
-    //dateContainer.classList.remove('d-flex');	
-    //inputDate.required = false;
-    //inputDate.value = ''; 
     btnAddSub.style.display = 'none';
     if (subEntriesDiv) subEntriesDiv.innerHTML = '';
   } // else needSource
@@ -1248,11 +1282,14 @@ function toggleSourceElements(entry, supportLabel) {
 // Exporter les données en JSON
 function downloadData() {
   const puAmount = safeParseFloat(amountPaidInput.value);
+  const firstName = sanitizeName(document.getElementById('first_name').value);
+  const lastName = sanitizeName(document.getElementById('last_name').value);
+  
   const partner = getSelectedPartner();
   const validation = validateEntries(originsList);
   if (validation === null) return;
 
-  const data = { puAmount, partner, entries: validation.results };
+  const data = { puAmount, firstName, lastName, partner, entries: validation.results };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
 
@@ -1276,10 +1313,11 @@ function uploadData(event) {
 
     amountPaidInput.value = data.puAmount;
     document.querySelector(`input[name="partner"][value="${data.partner}"]`).checked = true;
+	document.getElementById('first_name').value=sanitizeName(data.firstName);
+	document.getElementById('last_name').value=sanitizeName(data.lastName);
 
     originsList.innerHTML = "";
     createEntry(originsList, 1, true);
-    resultsTimeline.innerHTML = '';
     resultsDocs.innerHTML = '';
     resultsTerm.style.display = 'none';
     setButtonValidated(false);
@@ -1656,7 +1694,7 @@ function validateEntry(entry) {
         name: inputName.value,
         amount: amount.toFixed(2)
       }))
-  }
+  } // isLessThanDateThreshold && needsSource
 
   return {
     support: supportLabel,
@@ -1715,30 +1753,32 @@ function displayNeededDocuments(results, partner, tbody, level) {
 	  if (!(r.isLessThanDateThreshold && level == 1)) // on ne traite pas le compte courant s'il a une sous origine
 		{
 		  const row = document.createElement("tr");
-		  const cell1 = document.createElement("td");
-		  const cell2 = document.createElement("td");
-		  const cell3 = document.createElement("td");
-		  cell1.innerHTML = r.support +
-					   "<strong>/</strong> " + r.name +
-					   "<strong>/</strong> " + r.accountNumber +
-					   "<strong>/</strong> " + r.amount.toLocaleString('fr-FR', {minimumFractionDigits:2}) + " €";
+		  const cell0 = document.createElement("td");  //colonne numero
+		  cell0.innerHTML = "<p>"+(indexDisplayNeededDocuments++)+"</p>";
+		  const cell1 = document.createElement("td"); //colonne support
+		  cell1.innerHTML = [ r.support,r.name, r.accountNumber,
+			`${r.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`].join("<strong> / </strong> ");
+		  const cell2 = document.createElement("td"); //colonne documents
+		  const tableDoc = document.createElement("table");
+		  tableDoc.className = "table table-bordered";
 		  source.partners[partner].documents.forEach(doc => {
-			const p=document.createElement('p');
-			p.innerHTML = doc;
-			cell2.appendChild(p);
+			const tr = document.createElement("tr");
+			const td = document.createElement("td");
+			td.innerHTML = "<p>"+doc+"</p>"; // futur bouton upload ici
+			tr.appendChild(td);
+			tableDoc.appendChild(tr);
 		  });
-		  const p=document.createElement('p');
-		  source.partners[partner].comments.forEach(doc => {
-			const p=document.createElement('p');
-			p.innerHTML = doc;
+		  cell2.appendChild(tableDoc);// Colonne commentaires 
+		  const cell3 = document.createElement("td");
+		  source.partners[partner].comments.forEach(comment => {
+			const p = document.createElement("p");
+			p.innerHTML = comment;
 			cell3.appendChild(p);
 		  });
-		  row.appendChild(cell1);
-		  row.appendChild(cell2);
-		  row.appendChild(cell3);
+		  [cell0, cell1, cell2, cell3].forEach(c => row.appendChild(c));
 		  tbody.appendChild(row);
-		}
-    };
+		} // if (!(r.isLessThanDateThreshold && level == 1))
+    }; //if source
     if (r.subOrigins.length > 0) displayNeededDocuments(r.subOrigins, partner, tbody, level+1);
     return tbody;
   });
@@ -1765,15 +1805,14 @@ formOrigins.addEventListener('submit', e => {
     return;
   }
 
-  resultsTimeline.innerHTML = '';
-  displayResults(validation.results, resultsTimeline);
   const table = document.createElement('table');
   table.className = 'table table-bordered table-striped';
   const thead = document.createElement('thead');
-  thead.innerHTML ="<tr><th>Support</th><th>Documents requis</th><th>Informations</th></tr>";
+  thead.innerHTML ="<tr><th>No</th><th>Support</th><th>Documents requis</th><th>Informations</th></tr>";
   table.appendChild(thead);
   const tbody = document.createElement('tbody');
   table.appendChild(tbody);
+  indexDisplayNeededDocuments = 1;
   displayNeededDocuments(validation.results,getSelectedPartner(), tbody,1);
   resultsDocs.innerHTML = '';
   resultsDocs.appendChild(table);
@@ -1782,11 +1821,13 @@ formOrigins.addEventListener('submit', e => {
 });
 
 // Initialisation
+populateNameSurnameFromQuery();
 document.querySelectorAll('input[name="partner"]').forEach(radio => {
     radio.addEventListener('change', () => {
       markModified();
     });
 });
+let indexDisplayNeededDocuments=1;
 validateBtn.classList.add('btn-warning');
 amountPaidInput.addEventListener('input', markModified);
 originsList.addEventListener('input', markModified);
