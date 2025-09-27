@@ -354,9 +354,61 @@ const sourceOptions = [
                 ]
             }
         }
-    },
+    },  
     {
         "label": "LEP",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+	{
+        "label": "Livret Bleu",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé d’épargne à + de 6 mois",
+                    "Relevé du livret d'épargne  avec décaissement stabiloté",
+                    "Relevé du compte courant payeur de primes à date de souscription avec solde suffisant et encaissement stabiloté"
+                ],
+                "comments": [
+                    "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
+                ]
+            }
+        }
+    },
+	{
+        "label": "Livret Patrimoine",
         "needSource": 1,
         "partners": {
             "Abeille": {
@@ -1167,7 +1219,12 @@ const sourceOptions = [
                 "documents": [
                     "Relevé du compte courant d'associé à + de 6 mois",
                     "Relevé du compte courant professionnel avec décaissement",
-                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription + attestation de l'expert-comptable certifiant l'opération ou PV d'AG"
+                    "Relevé du compte courant payeur de prime avec solde suffisant à date de souscription + attestation de l'expert-comptable certifiant l'opération ou PV d'AG",
+					"Le dernier bilan comptable",
+					"Une attestation de l'expert-comptable certifiant l'opération OU PV d'Assemblée Générale",
+					"Relevé du compte courant professionnel avec décaissement",
+					"Relevé du compte courant payeur de primes avec encaissement", 
+					"Relevé du compte courant payeur de primes avec solde suffisant"
                 ],
                 "comments": [
                     "Si opération en cours de mois, capture d'écran recevable si et seulement si on voit apparaître la date, le numéro de compte, le montant"
@@ -1255,28 +1312,27 @@ function sourceNeedsOrigin(supportLabel) {
   return source ? source.needSource === 1 : true; 
 }
 
-function toggleSourceElements(entry, supportLabel) {
-  const inputDate = entry.querySelector('input[type="date"]');
-  //const dateContainer = inputDate.parentElement;
-  const btnAddSub = entry.querySelector('.btn-add-sub');
-  const subEntriesDiv = entry.querySelector('.sub-entries');
-  const needsSource = sourceNeedsOrigin(supportLabel);
-  
-  if (needsSource) {
-	if (inputDate && inputDate.value) {
-      const dateValue = new Date(inputDate.value);
-      const dateThreshold = new Date();
-      dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
-      if (dateValue > dateThreshold && btnAddSub) {
-        btnAddSub.style.display = 'inline-block';
-      }
-    }
-  } else { //if needSource
-    btnAddSub.style.display = 'none';
-    if (subEntriesDiv) subEntriesDiv.innerHTML = '';
-  } // else needSource
-}
+function toggleSourceElements(entryDiv, supportValue) {
+  const btnAddSub = entryDiv.querySelector('.btn-add-sub');
+  const subEntriesDiv = entryDiv.querySelector('.sub-entries');
+  const inputName    = entryDiv.querySelector('.input-establishment');
+  const inputAccount = entryDiv.querySelector('.input-account');
+  const inputDate    = entryDiv.querySelector('.input-date');
 
+  if (inputName)    inputName.style.display = 'none';
+  if (inputAccount) inputAccount.style.display = 'none';
+  if (inputDate)    inputDate.style.display = 'none';
+  if (subEntriesDiv) subEntriesDiv.style.display = '';
+
+  if (sourceNeedsOrigin(supportValue)) {
+    if (inputName)    inputName.style.display = '';
+    if (inputAccount) inputAccount.style.display = '';
+    if (inputDate)    inputDate.style.display = '';
+    if (btnAddSub)    btnAddSub.style.display = 'inline-block';
+  } else {
+    if (btnAddSub)    btnAddSub.style.display = 'none';
+  } 
+}
 
 // sauvegarde
 // Exporter les données en JSON
@@ -1328,7 +1384,7 @@ function uploadData(event) {
         let entry;
         if (level === 1 && idx === 0) {
           entry = parentDiv.children[0]; // première ligne déjà créée
-        } else entry = createEntry(parentDiv, level);
+        } else entry = createEntry(parentDiv, level, false);
 
         const select = entry.querySelector("select");
         const inputsText = entry.querySelectorAll('input[type="text"]');
@@ -1336,7 +1392,8 @@ function uploadData(event) {
         const inputAccount = inputsText[1];
         const inputAmount = entry.querySelector('input[type="number"]');
         const inputDate = entry.querySelector('input[type="date"]');
-
+		console.log(r.support);
+		console.log(r.date);
         select.value = r.support;
         inputName.value = r.name;
         inputAccount.value = r.accountNumber;
@@ -1351,9 +1408,10 @@ function uploadData(event) {
         }
       }); // forEach
     }
-
-    restoreEntries(data.entries, originsList);
-  };
+	restoreEntries(data.entries, originsList);
+    refreshOutdentButtons();
+	refreshMoveButtons();
+};
   reader.readAsText(file);
   document.getElementById('fileInput').value = '';
 }
@@ -1419,14 +1477,19 @@ function createEntry(parentDiv = originsList, groupIndex = 1, isFirst = false) {
   const group = document.createElement('div');
   group.className = 'input-group';
 
-  const select = createSupportSelect();
-  const inputName = createEstablishmentInput();
+  const select       = createSupportSelect();
+  const inputName    = createEstablishmentInput();
   const inputAccount = createAccountInput();
-  const inputAmount = createAmountInput();
-  const dateDiv = createDateContainer();
-  const btnAddSub = createAddSubButton();
-  const btnRemove = createRemoveButton();
-  const subEntriesDiv = createSubEntriesContainer();
+  const inputAmount  = createAmountInput();
+  const dateDiv      = createDateContainer();
+  const btnAddSub    = createAddSubButton();
+  const btnRemove    = createRemoveButton();
+
+  // 4 boutons de déplacement
+  const btnMoveUp   = createMoveUpButton();
+  const btnMoveDown = createMoveDownButton();
+  const btnIndent   = createIndentButton();
+  const btnOutdent  = createOutdentButton();
 
   group.appendChild(select);
   group.appendChild(inputName);
@@ -1434,15 +1497,42 @@ function createEntry(parentDiv = originsList, groupIndex = 1, isFirst = false) {
   group.appendChild(inputAmount);
   group.appendChild(dateDiv);
   group.appendChild(btnAddSub);
+  group.appendChild(btnMoveUp);
+  group.appendChild(btnMoveDown);
+  group.appendChild(btnIndent);
+  group.appendChild(btnOutdent);
   group.appendChild(btnRemove);
+
+  const subEntriesDiv = createSubEntriesContainer();
 
   entryDiv.appendChild(group);
   entryDiv.appendChild(subEntriesDiv);
   parentDiv.appendChild(entryDiv);
 
-  if (isFirst) configureFirstLine(select, inputAmount, inputAccount, btnRemove, entryDiv);
+  if (isFirst) {
+    configureFirstLine(
+      select, inputAmount, inputAccount,
+      btnRemove, entryDiv,
+      btnMoveUp, btnMoveDown, btnIndent, btnOutdent
+    );
+  }
 
-  setupEventListeners({inputDate: dateDiv.querySelector('input'),btnAddSub,subEntriesDiv,btnRemove,inputAmount,entryDiv,groupIndex,select,inputName,inputAccount});
+  setupEventListeners({
+    inputDate: dateDiv.querySelector('input'),
+    btnAddSub,
+    subEntriesDiv,
+    btnRemove,
+    inputAmount,
+    entryDiv,
+    groupIndex,
+    select,
+    inputName,
+    inputAccount,
+    btnMoveUp,
+    btnMoveDown,
+    btnIndent,
+    btnOutdent
+  });
 
   return entryDiv;
 }
@@ -1539,13 +1629,95 @@ function createRemoveButton() {
   return btn;
 }
 
+
+
+
+function createMoveUpButton() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.innerHTML = '<i class="bi bi-arrow-up" style="font-size:0.65rem"></i>';
+  btn.className = 'btn btn-light btn-sm p-0 px-1 text-muted';
+  btn.title = "Monter";
+  btn.dataset.role = 'move-up';
+  return btn;
+}
+
+function createMoveDownButton() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.innerHTML = '<i class="bi bi-arrow-down" style="font-size:0.65rem"></i>';
+  btn.className = 'btn btn-light btn-sm p-0 px-1 text-muted';;
+  btn.title = "Descendre";
+  btn.dataset.role = 'move-down';
+  return btn;
+}
+
+function createIndentButton() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.innerHTML = '<i class="bi bi-arrow-return-right" style="font-size:0.65rem"></i>';
+  btn.className = 'btn btn-light btn-sm p-0 px-1 text-muted';;
+  btn.title = "Descendre d'un niveau";
+  btn.dataset.role = 'indent';
+  return btn;
+}
+
+function createOutdentButton() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.innerHTML = '<i class="bi bi-arrow-return-left" style="font-size:0.65rem"></i>';
+  btn.className = 'btn btn-light btn-sm p-0 px-1 text-muted';;
+  btn.title = "Remonter d'un niveau";
+  btn.dataset.role = 'outdent';
+  return btn;
+}
+
+function refreshOutdentButtons() {
+  const root = originsList.querySelector(':scope > .entry');
+  if (!root) return;
+
+  // Réafficher ↩ pour toutes les entrées sauf root
+  const allEntries = Array.from(originsList.querySelectorAll('.entry')).filter(e => e !== root);
+  for (const entry of allEntries) {
+    const outBtn = entry.querySelector(':scope > .input-group [data-role="outdent"]');
+    if (outBtn) outBtn.style.display = '';
+  }
+
+  // Cacher ↩ pour les enfants directs du root
+  const directChildren = Array.from(root.querySelector(':scope > .sub-entries').children);
+  for (const child of directChildren) {
+    const outBtn = child.querySelector(':scope > .input-group [data-role="outdent"]');
+    if (outBtn) outBtn.style.display = 'none';
+  }
+}
+
+function refreshMoveButtons() {
+  const levels = document.querySelectorAll('.sub-entries');
+
+  levels.forEach(level => {
+    const entries = Array.from(level.querySelectorAll(':scope > .entry'));
+
+    entries.forEach((entry, index) => {
+      const btnUp   = entry.querySelector('[data-role="move-up"]');
+      const btnDown = entry.querySelector('[data-role="move-down"]');
+
+      if (btnUp)   btnUp.style.display   = (index === 0) ? 'none' : '';
+      if (btnDown) btnDown.style.display = (index === entries.length - 1) ? 'none' : '';
+    });
+  });
+}
+
 function createSubEntriesContainer() {
   const div = document.createElement('div');
   div.className = 'sub-entries';
   return div;
 }
 
-function configureFirstLine(select, inputAmount, inputAccount, btnRemove, entryDiv) {
+function configureFirstLine(
+  select, inputAmount, inputAccount, btnRemove, entryDiv,
+  btnMoveUp, btnMoveDown, btnIndent, btnOutdent
+) {
+  // Verrouillage Compte courant
   select.value = 'Compte courant';
   select.disabled = true;
   inputAmount.value = safeParseFloat(amountPaidInput.value);
@@ -1553,6 +1725,12 @@ function configureFirstLine(select, inputAmount, inputAccount, btnRemove, entryD
   inputAccount.required = false;
   btnRemove.style.display = 'none';
 
+  // Cacher les 4 boutons de déplacement
+  [btnMoveUp, btnMoveDown, btnIndent, btnOutdent].forEach(btn => {
+    if (btn) btn.style.display = 'none';
+  });
+
+  // Tooltip explicatif
   select.setAttribute('title', TEXTS.TOOLTIP_FIRST_LINE);
   select.setAttribute('data-bs-toggle', 'tooltip');
   select.setAttribute('data-bs-placement', 'top');
@@ -1570,11 +1748,20 @@ function configureFirstLine(select, inputAmount, inputAccount, btnRemove, entryD
     markModified();
     updateParentAmountStatus(entryDiv);
   });
+
+  // Vérifier les enfants directs au chargement
+  refreshOutdentButtons();
+  refreshMoveButtons();
 }
 
 
 function setupEventListeners(elements) {
-  const { inputDate, btnAddSub, subEntriesDiv, btnRemove, inputAmount, entryDiv, groupIndex, select, inputName, inputAccount } = elements;
+  const {
+    inputDate, btnAddSub, subEntriesDiv, btnRemove,
+    inputAmount, entryDiv, groupIndex, select,
+    inputName, inputAccount,
+    btnMoveUp, btnMoveDown, btnIndent, btnOutdent
+  } = elements;
 
   // Gestion du changement de support
   select.addEventListener('change', () => {
@@ -1614,12 +1801,62 @@ function setupEventListeners(elements) {
     subAmount.addEventListener('input', () => updateParentAmountStatus(entryDiv));
     updateParentAmountStatus(entryDiv);
     markModified();
+    refreshOutdentButtons();
+	refreshMoveButtons();
   });
 
-  // Mise à jour du montant parent
-  inputAmount.addEventListener('input', () => {
-    updateParentAmountStatus(entryDiv);
-    markModified();
+  // Monter (entre frères)
+  btnMoveUp.addEventListener('click', () => {
+    const prev = entryDiv.previousElementSibling;
+    if (prev) {
+      entryDiv.parentElement.insertBefore(entryDiv, prev);
+      markModified();
+      refreshOutdentButtons();
+	  refreshMoveButtons();
+    }
+  });
+
+  // Descendre (entre frères)
+  btnMoveDown.addEventListener('click', () => {
+    const next = entryDiv.nextElementSibling;
+    if (next) {
+      entryDiv.parentElement.insertBefore(next, entryDiv);
+      markModified();
+      refreshOutdentButtons();
+	  refreshMoveButtons();
+    }
+  });
+
+  // Descendre d'un niveau (devient enfant du frère précédent)
+  btnIndent.addEventListener('click', () => {
+    const prev = entryDiv.previousElementSibling;
+    if (prev) {
+      const prevSub = prev.querySelector(':scope > .sub-entries');
+      if (prevSub) {
+        const oldParent = entryDiv.parentElement.closest('.entry');
+        prevSub.appendChild(entryDiv);
+        if (oldParent) updateParentAmountStatus(oldParent);
+        updateParentAmountStatus(prev);
+        markModified();
+        refreshOutdentButtons();
+		refreshMoveButtons();
+      }
+    }
+  });
+
+  // Remonter d'un niveau (devient frère de son parent)
+  btnOutdent.addEventListener('click', () => {
+    const parentEntry = entryDiv.parentElement.closest('.entry');
+    if (parentEntry) {
+      const grandParent = parentEntry.parentElement;
+      grandParent.insertBefore(entryDiv, parentEntry.nextElementSibling);
+      updateParentAmountStatus(parentEntry);
+      const gpEntry = grandParent.closest('.entry');
+      if (gpEntry) updateParentAmountStatus(gpEntry);
+      markModified();
+      refreshOutdentButtons();
+	  refreshMoveButtons();
+    }
   });
 
   // Suppression d'entrée
@@ -1628,10 +1865,20 @@ function setupEventListeners(elements) {
     entryDiv.remove();
     if (parentEntry) updateParentAmountStatus(parentEntry);
     markModified();
+    refreshOutdentButtons();
+	refreshMoveButtons();
   });
 
-  // Événements de modification
-  [select, inputName, inputAccount, inputDate].forEach(element => { element.addEventListener('input', markModified); });
+  // Événements de saisie
+  [select, inputName, inputAccount, inputDate].forEach(element => {
+    element.addEventListener('input', markModified);
+  });
+
+  // Mise à jour du montant parent
+  inputAmount.addEventListener('input', () => {
+    updateParentAmountStatus(entryDiv);
+    markModified();
+  });
 }
 
 // gestion radio bouton
