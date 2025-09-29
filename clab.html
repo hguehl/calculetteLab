@@ -248,12 +248,10 @@ const TEXTS = {
   BTN_ADD_SUB: '+ Origine précédente',
   BTN_REMOVE: '×',
   BTN_VALIDATE: 'Valider',
-  
   // Messages d'aide (tooltips)
   TOOLTIP_FIRST_LINE: 'Renseigner le compte courant payeur sur la première ligne',
   TOOLTIP_SUB_ORIGIN: 'Les fonds sont arrivés il y a moins de 6 mois, il faut détailler en indiquant l\'origine précédente',
   TOOLTIP_AMOUNT_MISMATCH: 'Somme des sous-origines: {amount} €',
-  
   // Messages d'erreur
   ERROR_SELECT_SUPPORT: 'Veuillez sélectionner un support.',
   ERROR_ENTER_ESTABLISHMENT: 'Veuillez saisir un établissement.',
@@ -262,7 +260,6 @@ const TEXTS = {
   ERROR_AMOUNT_MISMATCH: 'La somme des sous-origines ({subSum} €) ne correspond pas au montant de l\'origine "{name}" ({amount} €).',
   ERROR_PU_AMOUNT_INVALID: 'Veuillez saisir un Montant PU valide (≥ 0).',
   ERROR_TOTAL_MISMATCH: 'La somme des origines ({sum} €) ne correspond pas au Montant PU versé ({puAmount} €).',
-  
   // Libellés pour l'affichage des résultats
   RESULT_SUPPORT: 'Support',
   RESULT_ESTABLISHMENT: 'Etablissement',
@@ -270,8 +267,13 @@ const TEXTS = {
   RESULT_AMOUNT: 'Montant',
   RESULT_DATE: 'Date d\'arrivée des fonds',
   RESULT_NOT_OLDER_THAN_THRESHOLD: 'Fonds arrivés il y a moins de 6 mois',
-  
-  NEEDED_DOCUMENTS: "Documents requis"
+  NEEDED_DOCUMENTS: "Documents requis",
+  BUTTON_MOVE_UP: 'Monter',
+  BUTTON_MOVE_DOWN: 'Descendre',
+  BUTTON_INDENT: 'Descendre d\'un niveau',
+  BUTTON_OUTDENT: 'Remonter d\'un niveau',
+  BUTTON_ADD_SUB: 'Ajouter une sous-origine',
+  LABEL_ACCOUNT_ROOT: 'Compte courant',
 };
 
 // Configuration - Paramètres
@@ -1392,8 +1394,6 @@ function uploadData(event) {
         const inputAccount = inputsText[1];
         const inputAmount = entry.querySelector('input[type="number"]');
         const inputDate = entry.querySelector('input[type="date"]');
-		console.log(r.support);
-		console.log(r.date);
         select.value = r.support;
         inputName.value = r.name;
         inputAccount.value = r.accountNumber;
@@ -1476,7 +1476,6 @@ function createEntry(parentDiv = originsList, groupIndex = 1, isFirst = false) {
   const entryDiv = createMainContainer(groupIndex);
   const group = document.createElement('div');
   group.className = 'input-group';
-
   const select       = createSupportSelect();
   const inputName    = createEstablishmentInput();
   const inputAccount = createAccountInput();
@@ -1484,24 +1483,14 @@ function createEntry(parentDiv = originsList, groupIndex = 1, isFirst = false) {
   const dateDiv      = createDateContainer();
   const btnAddSub    = createAddSubButton();
   const btnRemove    = createRemoveButton();
-
   // 4 boutons de déplacement
-  const btnMoveUp   = createMoveUpButton();
-  const btnMoveDown = createMoveDownButton();
-  const btnIndent   = createIndentButton();
-  const btnOutdent  = createOutdentButton();
+  const btnMoveUp = createActionButton('bi-arrow-up', TEXTS.BUTTON_MOVE_UP, 'move-up');
+  const btnMoveDown = createActionButton('bi-arrow-down', TEXTS.BUTTON_MOVE_DOWN, 'move-down');
+  const btnIndent = createActionButton('bi-arrow-return-right', TEXTS.BUTTON_INDENT, 'indent');
+  const btnOutdent = createActionButton('bi-arrow-return-left', TEXTS.BUTTON_OUTDENT, 'outdent');
 
-  group.appendChild(select);
-  group.appendChild(inputName);
-  group.appendChild(inputAccount);
-  group.appendChild(inputAmount);
-  group.appendChild(dateDiv);
-  group.appendChild(btnAddSub);
-  group.appendChild(btnMoveUp);
-  group.appendChild(btnMoveDown);
-  group.appendChild(btnIndent);
-  group.appendChild(btnOutdent);
-  group.appendChild(btnRemove);
+  [ select, inputName, inputAccount, inputAmount, dateDiv, btnAddSub, 
+         btnMoveUp, btnMoveDown, btnIndent, btnOutdent, btnRemove].forEach(el => group.appendChild(el));
 
   const subEntriesDiv = createSubEntriesContainer();
 
@@ -1509,31 +1498,12 @@ function createEntry(parentDiv = originsList, groupIndex = 1, isFirst = false) {
   entryDiv.appendChild(subEntriesDiv);
   parentDiv.appendChild(entryDiv);
 
-  if (isFirst) {
-    configureFirstLine(
-      select, inputAmount, inputAccount,
-      btnRemove, entryDiv,
-      btnMoveUp, btnMoveDown, btnIndent, btnOutdent
-    );
-  }
+  if (isFirst) configureFirstLine( select, inputAmount, inputAccount, btnRemove, entryDiv,  btnMoveUp, btnMoveDown, btnIndent, btnOutdent);
 
   setupEventListeners({
-    inputDate: dateDiv.querySelector('input'),
-    btnAddSub,
-    subEntriesDiv,
-    btnRemove,
-    inputAmount,
-    entryDiv,
-    groupIndex,
-    select,
-    inputName,
-    inputAccount,
-    btnMoveUp,
-    btnMoveDown,
-    btnIndent,
-    btnOutdent
-  });
-
+    inputDate: dateDiv.querySelector('input'), btnAddSub, subEntriesDiv, btnRemove,  inputAmount, entryDiv, 
+	  groupIndex, select, inputName, inputAccount, btnMoveUp, btnMoveDown, btnIndent, btnOutdent });
+	  
   return entryDiv;
 }
 
@@ -1564,7 +1534,6 @@ function createSupportSelect() {
   });
   return select;
 }
-
 
 function createEstablishmentInput() {
   const input = document.createElement('input');
@@ -1621,69 +1590,35 @@ function createAddSubButton() {
   return btn;
 }
 
-function createRemoveButton() {
+function createRemoveButton() {;
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = TEXTS.BTN_REMOVE;
   btn.className = 'btn btn-danger btn-sm';
   return btn;
-}
+};
 
-
-
-
-function createMoveUpButton() {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.innerHTML = '<i class="bi bi-arrow-up" style="font-size:0.65rem"></i>';
-  btn.className = 'btn btn-light btn-sm p-0 px-1 text-muted';
-  btn.title = "Monter";
-  btn.dataset.role = 'move-up';
-  return btn;
-}
-
-function createMoveDownButton() {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.innerHTML = '<i class="bi bi-arrow-down" style="font-size:0.65rem"></i>';
-  btn.className = 'btn btn-light btn-sm p-0 px-1 text-muted';;
-  btn.title = "Descendre";
-  btn.dataset.role = 'move-down';
-  return btn;
-}
-
-function createIndentButton() {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.innerHTML = '<i class="bi bi-arrow-return-right" style="font-size:0.65rem"></i>';
-  btn.className = 'btn btn-light btn-sm p-0 px-1 text-muted';;
-  btn.title = "Descendre d'un niveau";
-  btn.dataset.role = 'indent';
-  return btn;
-}
-
-function createOutdentButton() {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.innerHTML = '<i class="bi bi-arrow-return-left" style="font-size:0.65rem"></i>';
-  btn.className = 'btn btn-light btn-sm p-0 px-1 text-muted';;
-  btn.title = "Remonter d'un niveau";
-  btn.dataset.role = 'outdent';
-  return btn;
+function createActionButton(icon, text, role) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.innerHTML = '<i class="bi '+icon+' style="font-size:0.65rem"></i>';
+    btn.className = 'btn btn-light btn-sm p-0 px-1 text-muted';
+    btn.title = text;
+    btn.setAttribute('aria-label', text);
+    btn.dataset.role = role;
+    return btn;
 }
 
 function refreshOutdentButtons() {
   const root = originsList.querySelector(':scope > .entry');
   if (!root) return;
-
-  // Réafficher ↩ pour toutes les entrées sauf root
+  // Réafficher pour toutes les entrées sauf root
   const allEntries = Array.from(originsList.querySelectorAll('.entry')).filter(e => e !== root);
   for (const entry of allEntries) {
     const outBtn = entry.querySelector(':scope > .input-group [data-role="outdent"]');
     if (outBtn) outBtn.style.display = '';
   }
-
-  // Cacher ↩ pour les enfants directs du root
+  // Cacher pour les enfants directs du root
   const directChildren = Array.from(root.querySelector(':scope > .sub-entries').children);
   for (const child of directChildren) {
     const outBtn = child.querySelector(':scope > .input-group [data-role="outdent"]');
@@ -1695,12 +1630,10 @@ function refreshMoveButtons() {
   const levels = document.querySelectorAll('.sub-entries');
 
   levels.forEach(level => {
-    const entries = Array.from(level.querySelectorAll(':scope > .entry'));
-
+    const entries = Array.from(level.querySelectorAll(':scope > .entry'));CONFIG
     entries.forEach((entry, index) => {
       const btnUp   = entry.querySelector('[data-role="move-up"]');
       const btnDown = entry.querySelector('[data-role="move-down"]');
-
       if (btnUp)   btnUp.style.display   = (index === 0) ? 'none' : '';
       if (btnDown) btnDown.style.display = (index === entries.length - 1) ? 'none' : '';
     });
@@ -1715,21 +1648,18 @@ function createSubEntriesContainer() {
 
 function configureFirstLine(
   select, inputAmount, inputAccount, btnRemove, entryDiv,
-  btnMoveUp, btnMoveDown, btnIndent, btnOutdent
-) {
+  btnMoveUp, btnMoveDown, btnIndent, btnOutdent) {
   // Verrouillage Compte courant
-  select.value = 'Compte courant';
+  select.value = TEXTS.LABEL_ACCOUNT_ROOT;
   select.disabled = true;
   inputAmount.value = safeParseFloat(amountPaidInput.value);
   inputAmount.disabled = true;
   inputAccount.required = false;
   btnRemove.style.display = 'none';
-
   // Cacher les 4 boutons de déplacement
   [btnMoveUp, btnMoveDown, btnIndent, btnOutdent].forEach(btn => {
     if (btn) btn.style.display = 'none';
   });
-
   // Tooltip explicatif
   select.setAttribute('title', TEXTS.TOOLTIP_FIRST_LINE);
   select.setAttribute('data-bs-toggle', 'tooltip');
@@ -1741,19 +1671,35 @@ function configureFirstLine(
     firstTooltip.hide();
     select.classList.remove('highlight-tooltip');
   }, CONFIG.TOOLTIP_DURATION_FIRST_LINE);
-
   // Synchronisation avec le montant PU
   amountPaidInput.addEventListener('input', () => {
     inputAmount.value = safeParseFloat(amountPaidInput.value);
     markModified();
     updateParentAmountStatus(entryDiv);
   });
-
   // Vérifier les enfants directs au chargement
   refreshOutdentButtons();
   refreshMoveButtons();
 }
 
+function updateAddSubButton(select, inputDate, btnAddSub) {
+    if (!btnAddSub) return;
+   
+    const supportEligible = sourceNeedsOrigin(select.value);
+    const dateValue = inputDate.value ? new Date(inputDate.value) : null;
+    const dateThreshold = new Date();
+    dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
+
+	if (supportEligible && dateValue && dateValue > dateThreshold) {
+    btnAddSub.style.display = 'inline-block';
+      btnAddSub.setAttribute('title', TEXTS.TOOLTIP_SUB_ORIGIN);
+      btnAddSub.setAttribute('data-bs-toggle', 'tooltip');
+      btnAddSub.setAttribute('data-bs-placement', 'top');
+      const subTooltip = new bootstrap.Tooltip(btnAddSub);
+      subTooltip.show();
+      setTimeout(() => subTooltip.hide(), CONFIG.TOOLTIP_DURATION_SUB_ORIGIN);
+    } else btnAddSub.style.display = 'none';
+}
 
 function setupEventListeners(elements) {
   const {
@@ -1766,34 +1712,14 @@ function setupEventListeners(elements) {
   // Gestion du changement de support
   select.addEventListener('change', () => {
     toggleSourceElements(entryDiv, select.value);
+	updateAddSubButton(select, inputDate, btnAddSub);
     markModified();
   });
-
   // Changement de date
   inputDate.addEventListener('change', () => {
-    const supportLabel = select.value;
-    if (!sourceNeedsOrigin(supportLabel)) return;
-
-    const dateValue = new Date(inputDate.value);
-    const dateThreshold = new Date();
-    dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
-
-    if (dateValue && dateValue > dateThreshold) {
-      btnAddSub.style.display = 'inline-block';
-      btnAddSub.setAttribute('title', TEXTS.TOOLTIP_SUB_ORIGIN);
-      btnAddSub.setAttribute('data-bs-toggle', 'tooltip');
-      btnAddSub.setAttribute('data-bs-placement', 'top');
-      const subTooltip = new bootstrap.Tooltip(btnAddSub);
-      subTooltip.show();
-      setTimeout(() => subTooltip.hide(), CONFIG.TOOLTIP_DURATION_SUB_ORIGIN);
-    } else {
-      btnAddSub.style.display = 'none';
-      subEntriesDiv.innerHTML = '';
-      updateParentAmountStatus(entryDiv);
-    }
+    updateAddSubButton(select, inputDate, btnAddSub);
     markModified();
   });
-
   // Ajout de sous-origine
   btnAddSub.addEventListener('click', () => {
     const subEntry = createEntry(subEntriesDiv, groupIndex + 1);
@@ -1804,7 +1730,6 @@ function setupEventListeners(elements) {
     refreshOutdentButtons();
 	refreshMoveButtons();
   });
-
   // Monter (entre frères)
   btnMoveUp.addEventListener('click', () => {
     const prev = entryDiv.previousElementSibling;
@@ -1815,7 +1740,6 @@ function setupEventListeners(elements) {
 	  refreshMoveButtons();
     }
   });
-
   // Descendre (entre frères)
   btnMoveDown.addEventListener('click', () => {
     const next = entryDiv.nextElementSibling;
@@ -1826,7 +1750,6 @@ function setupEventListeners(elements) {
 	  refreshMoveButtons();
     }
   });
-
   // Descendre d'un niveau (devient enfant du frère précédent)
   btnIndent.addEventListener('click', () => {
     const prev = entryDiv.previousElementSibling;
@@ -1843,7 +1766,6 @@ function setupEventListeners(elements) {
       }
     }
   });
-
   // Remonter d'un niveau (devient frère de son parent)
   btnOutdent.addEventListener('click', () => {
     const parentEntry = entryDiv.parentElement.closest('.entry');
@@ -1858,7 +1780,6 @@ function setupEventListeners(elements) {
 	  refreshMoveButtons();
     }
   });
-
   // Suppression d'entrée
   btnRemove.addEventListener('click', () => {
     const parentEntry = entryDiv.parentElement.closest('.entry');
@@ -1868,12 +1789,10 @@ function setupEventListeners(elements) {
     refreshOutdentButtons();
 	refreshMoveButtons();
   });
-
   // Événements de saisie
   [select, inputName, inputAccount, inputDate].forEach(element => {
     element.addEventListener('input', markModified);
   });
-
   // Mise à jour du montant parent
   inputAmount.addEventListener('input', () => {
     updateParentAmountStatus(entryDiv);
@@ -1928,12 +1847,9 @@ function validateEntry(entry) {
   if (isLessThanDateThreshold && needsSource) {
     if (subDiv.children.length === 0)
       return alertAndStop(formatMessage(TEXTS.ERROR_ADD_SUB_ORIGIN, { name: inputName.value }))
-
     const subValidation = validateEntries(subDiv)
     if (!subValidation) return null
-
     subResults = sortByDate(subValidation.results)
-
     const subSum = subValidation.sum
     if (Math.abs(subSum - amount) > 0.01)
       return alertAndStop(formatMessage(TEXTS.ERROR_AMOUNT_MISMATCH, {
@@ -1942,15 +1858,10 @@ function validateEntry(entry) {
         amount: amount.toFixed(2)
       }))
   } // isLessThanDateThreshold && needsSource
-
   return {
-    support: supportLabel,
-    name: inputName.value.trim(),
-    accountNumber: inputAccount.value.trim(),
-    amount,
-    date: inputDate.value.trim(),
-    isLessThanDateThreshold,
-    subOrigins: subResults
+    support: supportLabel, name: inputName.value.trim(),
+    accountNumber: inputAccount.value.trim(), amount,
+    date: inputDate.value.trim(), isLessThanDateThreshold, subOrigins: subResults
   }
 }
 
@@ -1969,7 +1880,6 @@ function validateEntries(parentDiv) {
 
   return { sum, results }
 }
-
 
 // Affichage des résultats
 function displayResults(results, container) {
@@ -2034,16 +1944,13 @@ function displayNeededDocuments(results, partner, tbody, level) {
 // Soumission du formulaire
 formOrigins.addEventListener('submit', e => {
   e.preventDefault();
-  const puAmount = safeParseFloat(amountPaidInput.value);
-  
+  const puAmount = safeParseFloat(amountPaidInput.value); 
   if (isNaN(puAmount) || puAmount < 0) {
     alert(TEXTS.ERROR_PU_AMOUNT_INVALID);
     return;
   }
-
   const validation = validateEntries(originsList);
   if (validation === null) return;
-
   if (Math.abs(validation.sum - puAmount) > 0.01) {
     alert(formatMessage(TEXTS.ERROR_TOTAL_MISMATCH, {
       sum: validation.sum.toFixed(2),
@@ -2051,7 +1958,6 @@ formOrigins.addEventListener('submit', e => {
     }));
     return;
   }
-
   const table = document.createElement('table');
   table.className = 'table table-bordered table-striped';
   const thead = document.createElement('thead');
