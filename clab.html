@@ -268,11 +268,10 @@ const TEXTS = {
   RESULT_DATE: 'Date d\'arrivée des fonds',
   RESULT_NOT_OLDER_THAN_THRESHOLD: 'Fonds arrivés il y a moins de 6 mois',
   NEEDED_DOCUMENTS: "Documents requis",
-  BUTTON_MOVE_UP: 'Monter',
-  BUTTON_MOVE_DOWN: 'Descendre',
-  BUTTON_INDENT: 'Descendre d\'un niveau',
-  BUTTON_OUTDENT: 'Remonter d\'un niveau',
-  BUTTON_ADD_SUB: 'Ajouter une sous-origine',
+  BTN_MOVE_UP: 'Monter',
+  BTN_MOVE_DOWN: 'Descendre',
+  BTN_INDENT: 'Descendre d\'un niveau',
+  BTN_OUTDENT: 'Remonter d\'un niveau',
   LABEL_ACCOUNT_ROOT: 'Compte courant',
 };
 
@@ -1434,10 +1433,11 @@ function markModified() {
 
 // Gestion des tooltips et montants
 function updateParentAmountStatus(entry) {
+  const parentDiv = entry.closest('.entry');
+  if (!parentDiv) return;
   const inputAmountParent = entry.querySelector('.input-group input[type="number"]');
   const subEntries = entry.querySelector(':scope > .sub-entries');
   if (!inputAmountParent || !subEntries) return;
-
   // Calcul de la somme des sous-origines directes
   const directChildren = Array.from(subEntries.children);
   const subSum = directChildren.reduce((acc, child) => {
@@ -1445,17 +1445,13 @@ function updateParentAmountStatus(entry) {
     return acc + safeParseFloat(amt?.value);
   }, 0);
   const parentAmount = safeParseFloat(inputAmountParent.value);
-
   // Reset du tooltip existant
   let tip = bootstrap.Tooltip.getInstance(inputAmountParent);
   if (tip) tip.dispose();
-
   // Vérification et affichage du tooltip si nécessaire
   if (directChildren.length > 0 && Math.abs(subSum - parentAmount) > 0.01) {
     inputAmountParent.classList.add('text-danger');
-    const tooltipText = formatMessage(TEXTS.TOOLTIP_AMOUNT_MISMATCH, { 
-      amount: formatCurrency(subSum) 
-    });
+    const tooltipText = formatMessage(TEXTS.TOOLTIP_AMOUNT_MISMATCH, {  amount: formatCurrency(subSum) });
     inputAmountParent.setAttribute('title', tooltipText);
     inputAmountParent.setAttribute('data-bs-toggle', 'tooltip');
     inputAmountParent.setAttribute('data-bs-placement', 'top');
@@ -1469,6 +1465,10 @@ function updateParentAmountStatus(entry) {
     inputAmountParent.removeAttribute('data-bs-placement');
     inputAmountParent.removeAttribute('data-bs-custom-class');
   }
+  // traitement du recalcul en remontant
+  const parentEntry = entry.parentElement ? entry.parentElement.closest('.entry') : null;
+  if (parentEntry) updateParentAmountStatus(parentEntry);
+  
 }
 
 //  Création d'une ligne du formulaire  
@@ -1484,16 +1484,15 @@ function createEntry(parentDiv = originsList, groupIndex = 1, isFirst = false) {
   const btnAddSub    = createAddSubButton();
   const btnRemove    = createRemoveButton();
   // 4 boutons de déplacement
-  const btnMoveUp = createActionButton('bi-arrow-up', TEXTS.BUTTON_MOVE_UP, 'move-up');
-  const btnMoveDown = createActionButton('bi-arrow-down', TEXTS.BUTTON_MOVE_DOWN, 'move-down');
-  const btnIndent = createActionButton('bi-arrow-return-right', TEXTS.BUTTON_INDENT, 'indent');
-  const btnOutdent = createActionButton('bi-arrow-return-left', TEXTS.BUTTON_OUTDENT, 'outdent');
+  const btnMoveUp = createActionButton('bi-arrow-up', TEXTS.BTN_MOVE_UP, 'move-up');
+  const btnMoveDown = createActionButton('bi-arrow-down', TEXTS.BTN_MOVE_DOWN, 'move-down');
+  const btnIndent = createActionButton('bi-arrow-return-right', TEXTS.BTN_INDENT, 'indent');
+  const btnOutdent = createActionButton('bi-arrow-return-left', TEXTS.BTN_OUTDENT, 'outdent');
 
   [ select, inputName, inputAccount, inputAmount, dateDiv, btnAddSub, 
          btnMoveUp, btnMoveDown, btnIndent, btnOutdent, btnRemove].forEach(el => group.appendChild(el));
 
   const subEntriesDiv = createSubEntriesContainer();
-
   entryDiv.appendChild(group);
   entryDiv.appendChild(subEntriesDiv);
   parentDiv.appendChild(entryDiv);
@@ -1596,12 +1595,12 @@ function createRemoveButton() {;
   btn.textContent = TEXTS.BTN_REMOVE;
   btn.className = 'btn btn-danger btn-sm';
   return btn;
-};
+}
 
 function createActionButton(icon, text, role) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.innerHTML = '<i class="bi '+icon+' style="font-size:0.65rem"></i>';
+    btn.innerHTML = '<i class="bi '+icon+'" style="font-size:0.65rem"></i>';
     btn.className = 'btn btn-light btn-sm p-0 px-1 text-muted';
     btn.title = text;
     btn.setAttribute('aria-label', text);
@@ -1628,9 +1627,8 @@ function refreshOutdentButtons() {
 
 function refreshMoveButtons() {
   const levels = document.querySelectorAll('.sub-entries');
-
   levels.forEach(level => {
-    const entries = Array.from(level.querySelectorAll(':scope > .entry'));CONFIG
+    const entries = Array.from(level.querySelectorAll(':scope > .entry'));
     entries.forEach((entry, index) => {
       const btnUp   = entry.querySelector('[data-role="move-up"]');
       const btnDown = entry.querySelector('[data-role="move-down"]');
@@ -1657,9 +1655,7 @@ function configureFirstLine(
   inputAccount.required = false;
   btnRemove.style.display = 'none';
   // Cacher les 4 boutons de déplacement
-  [btnMoveUp, btnMoveDown, btnIndent, btnOutdent].forEach(btn => {
-    if (btn) btn.style.display = 'none';
-  });
+  [btnMoveUp, btnMoveDown, btnIndent, btnOutdent].forEach(btn => { if (btn) btn.style.display = 'none'; });
   // Tooltip explicatif
   select.setAttribute('title', TEXTS.TOOLTIP_FIRST_LINE);
   select.setAttribute('data-bs-toggle', 'tooltip');
@@ -1683,13 +1679,11 @@ function configureFirstLine(
 }
 
 function updateAddSubButton(select, inputDate, btnAddSub) {
-    if (!btnAddSub) return;
-   
+    if (!btnAddSub) return;   
     const supportEligible = sourceNeedsOrigin(select.value);
     const dateValue = inputDate.value ? new Date(inputDate.value) : null;
     const dateThreshold = new Date();
     dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
-
 	if (supportEligible && dateValue && dateValue > dateThreshold) {
     btnAddSub.style.display = 'inline-block';
       btnAddSub.setAttribute('title', TEXTS.TOOLTIP_SUB_ORIGIN);
@@ -1708,7 +1702,6 @@ function setupEventListeners(elements) {
     inputName, inputAccount,
     btnMoveUp, btnMoveDown, btnIndent, btnOutdent
   } = elements;
-
   // Gestion du changement de support
   select.addEventListener('change', () => {
     toggleSourceElements(entryDiv, select.value);
@@ -1869,15 +1862,12 @@ function validateEntries(parentDiv) {
   const entries = Array.from(parentDiv.children)
   let sum = 0
   const results = []
-
   for (const entry of entries) {
     const validated = validateEntry(entry)
     if (!validated) return null
-
     sum += validated.amount
     results.push(validated)
   }
-
   return { sum, results }
 }
 
