@@ -316,23 +316,25 @@ const sourceOptions = [
         }
     },
 	{
-        "label": "Compte courant de transit",
+        "label": "Compte courant de Transit",
         "needSource": 1,
         "partners": {
             "Abeille": {
                 "documents": [
-                    "Relevé du compte  XXX"
+                    "Le relevé du compte courant avec l'encaissement des fonds",
+                    "Le relevé du compte courant avec le décaissement des fonds"
                 ],
                 "comments": [
-                    "XXX"
+
                 ]
             },
             "SwissLife": {
                 "documents": [
-                    "Relevé du compte YYY"
+                    "Le relevé du compte courant avec l'encaissement des fonds",
+                    "Le relevé du compte courant avec le décaissement des fonds"
                 ],
                 "comments": [
-                    "YYY"
+                    
                 ]
             }
         }
@@ -1875,6 +1877,7 @@ function validateEntry(entry) {
   const supportLabel = select.value;
   const needsSource  = sourceNeedsOrigin(supportLabel);
 
+  
   if (!supportLabel) return alertAndStop(TEXTS.ERROR_SELECT_SUPPORT);
   if (!inputName.value.trim()) return alertAndStop(TEXTS.ERROR_ENTER_ESTABLISHMENT);
 
@@ -1885,11 +1888,10 @@ function validateEntry(entry) {
   const dateThreshold = new Date();
   dateThreshold.setMonth(dateThreshold.getMonth() - CONFIG.MONTHS_THRESHOLD);
   const isLessThanDateThreshold = dateValue > dateThreshold;
-
   let subResults = [];
   if (isLessThanDateThreshold && needsSource) {
     if (subDiv.children.length === 0) {
-      return (formatMessage(TEXTS.ERROR_ADD_SUB_ORIGIN, { name: inputName.value }));
+      return alertAndStop(formatMessage(TEXTS.ERROR_ADD_SUB_ORIGIN, { name: inputName.value }));
     }
     const subValidation = validateEntries(subDiv);
     if (!subValidation) return null;
