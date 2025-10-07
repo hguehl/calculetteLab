@@ -315,6 +315,28 @@ const sourceOptions = [
             }
         }
     },
+	{
+        "label": "Compte courant de transit",
+        "needSource": 1,
+        "partners": {
+            "Abeille": {
+                "documents": [
+                    "Relevé du compte  XXX"
+                ],
+                "comments": [
+                    "XXX"
+                ]
+            },
+            "SwissLife": {
+                "documents": [
+                    "Relevé du compte YYY"
+                ],
+                "comments": [
+                    "YYY"
+                ]
+            }
+        }
+    },
     {
         "label": "Assurance-vie",
         "needSource": 1,
@@ -1303,19 +1325,8 @@ function sourceNeedsOrigin(supportLabel) {
  */
 function toggleSourceElements(entryDiv, supportValue) {
   const btnAddSub = entryDiv.querySelector('.btn-add-sub');
-  const subEntriesDiv = entryDiv.querySelector('.sub-entries');
-  const inputName    = entryDiv.querySelector('.input-establishment');
-  const inputAccount = entryDiv.querySelector('.input-account');
-  const inputDate    = entryDiv.querySelector('.input-date');
-  //inputName.style.display = 'none';
-  //inputAccount.style.display = 'none';
-  //inputDate.style.display = 'none';
-  //subEntriesDiv.style.display = '';
   if (sourceNeedsOrigin(supportValue)) {
-    //inputName.style.display = '';
-    //inputAccount.style.display = '';
-    //inputDate.style.display = '';
-    btnAddSub.style.display = 'inline-block';
+      btnAddSub.style.display = 'inline-block';
   } else {
     btnAddSub.style.display = 'none';
   }
@@ -1466,7 +1477,8 @@ function updateParentAmountStatus(entry) {
   let tip = bootstrap.Tooltip.getInstance(inputAmountParent);
   if (tip) tip.dispose();
   
-  if (directChildren.length > 0 && Math.abs(subSum - parentAmount) > CONFIG.AMOUNT_PRECISION) {
+  //if (directChildren.length > 0 && Math.abs(subSum - parentAmount) > CONFIG.AMOUNT_PRECISION) {
+  if (directChildren.length > 0 && Math.abs(subSum) < parentAmount) {
     inputAmountParent.classList.add('text-danger');
     const tooltipText = formatMessage(TEXTS.TOOLTIP_AMOUNT_MISMATCH, { amount: formatCurrency(subSum) });
     inputAmountParent.title = tooltipText;
@@ -1877,13 +1889,13 @@ function validateEntry(entry) {
   let subResults = [];
   if (isLessThanDateThreshold && needsSource) {
     if (subDiv.children.length === 0) {
-      return alertAndStop(formatMessage(TEXTS.ERROR_ADD_SUB_ORIGIN, { name: inputName.value }));
+      return (formatMessage(TEXTS.ERROR_ADD_SUB_ORIGIN, { name: inputName.value }));
     }
     const subValidation = validateEntries(subDiv);
     if (!subValidation) return null;
     subResults = sortByDate(subValidation.results);
     const subSum = subValidation.sum;
-    if (Math.abs(subSum - amount) > CONFIG.AMOUNT_PRECISION) {
+    if (Math.abs(subSum) < amount) {
       return alertAndStop(formatMessage(TEXTS.ERROR_AMOUNT_MISMATCH, {
         subSum: subSum.toFixed(2),
         name: inputName.value,
